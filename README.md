@@ -13,7 +13,7 @@ blobrun saves all incoming files in an *spool* folder and then returns, so this
 processing should not take longer than the time it takes to write the file to
 disk.
 
-A periodic scan of the directory *spool* directory will pick up new files, and
+A periodic scan of the *spool* directory will pick up new files, and
 will process them, e.g. send the content to grobid, run pdftotext, and similar.
 
 These derivations can fail and retried, there is not time pressure, as long as
