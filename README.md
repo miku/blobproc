@@ -1,5 +1,7 @@
 # blobrun
 
+status: not implemented, just a sketch and notes
+
 A webhook server that can receive raw bytes and execute commands. Original use
 case: Receiving scholarly PDF documents and running a few derivations on them.
 
