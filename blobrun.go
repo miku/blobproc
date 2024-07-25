@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +22,14 @@ func (svc *RunnerService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	n, err := io.Copy(tmpf, r.Body)
+	if err != nil {
+		log.Printf("failed to drain response body: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	log.Printf("received and stored file: %db", n)
+	defer os.Remove(tmpf.Name())
 }
 
 func main() {

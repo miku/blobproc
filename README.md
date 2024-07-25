@@ -19,7 +19,8 @@ the "spool" directory does not exceed a given limit, e.g. 80% of the free space
 on the disk.
 
 Once all derivations ran successfully, the file is deleted from the "spool"
-directory.
+directory. If the server dies and comes back up, the files in the "spool"
+directory represent the state.
 
 ## Derivations
 
