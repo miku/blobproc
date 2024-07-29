@@ -56,13 +56,13 @@ func (r *GrobidRunner) RunBatch() error {
 	// TODO: use goroutines to process files in parallel
 	for _, filename := range r.batch {
 		params := url.Values{
-			"generateIds":            "1",
-			"consolidateHeader":      "1",
-			"consolidateCitations":   "1",
-			"includeRawCitations":    "1",
-			"includeRawAffiliations": "1",
-			"teiCoordinates":         "1",
-			"segmentSentences":       "1",
+			"generateIds":            []string{"1"},
+			"consolidateHeader":      []string{"1"},
+			"consolidateCitations":   []string{"1"},
+			"includeRawCitations":    []string{"1"},
+			"includeRawAffiliations": []string{"1"},
+			"teiCoordinates":         []string{"1"},
+			"segmentSentences":       []string{"1"},
 		}
 		http.NewRequest("POST", r.processFulltextDocumentURL(), params)
 	}
