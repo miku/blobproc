@@ -1,14 +1,16 @@
 SHELL := /bin/bash
-TARGETS := blobrun
+TARGETS := webspoold
+
 .PHONY: all
 all: $(TARGETS)
 
-%: %.go
+%: cmd/%/main.go
 	go build -o $@ $<
 
 .PHONY: clean
 clean:
 	rm -f $(TARGETS)
+
 
 .PHONY: update-all-deps
 update-all-deps:
