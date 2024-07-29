@@ -2,14 +2,19 @@ package main
 
 import (
 	"crypto/sha1"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/adrg/xdg"
@@ -30,9 +35,18 @@ var errShortName = errors.New("short name")
 
 const tempFilePattern = "webspoold-*"
 
-// WebSpoolService saves web payload to a configured directory.
+// WebSpoolService saves web payload to a configured directory. TODO: add limit
+// in size (e.g. 80% of disk or absolute value)
 type WebSpoolService struct {
 	Dir string
+}
+
+// spoolListEntry collects basic information about a spooled file.
+type spoolListEntry struct {
+	Name    string `json:"name"`
+	Size    int64  `json:"size"`
+	ModTime string `json:"t"`
+	URL     string `json:"url"`
 }
 
 // shardedPath takes a filename and returns the full path, including shards. If
@@ -66,13 +80,59 @@ func (svc *WebSpoolService) shardedPathExists(filename string) (bool, error) {
 	return false, nil
 }
 
+func shardedPathToIdentifier(path string) string {
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 {
+		return ""
+	}
+	n := len(parts)
+	return parts[n-3] + parts[n-2] + parts[n-1]
+}
+
+func (svc *WebSpoolService) SpoolListHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		entry spoolListEntry
+		enc   = json.NewEncoder(w)
+	)
+	err := filepath.Walk(svc.Dir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		id := shardedPathToIdentifier(path)
+		if len(id) == 0 {
+			slog.Error("zero length id")
+			w.WriteHeader(http.StatusInternalServerError)
+			return fmt.Errorf("zero length id")
+		}
+		entry = spoolListEntry{
+			Name:    id,
+			Size:    info.Size(),
+			ModTime: info.ModTime().Format(time.RFC3339),
+			URL:     fmt.Sprintf("http://%v/spool/%v", *listenAddr, id),
+		}
+		if err := enc.Encode(entry); err != nil {
+			slog.Error("encoding error", "err", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		slog.Error("failed to list files", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
 func (svc *WebSpoolService) SpoolStatusHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		vars   = mux.Vars(r)
 		digest = vars["id"]
 	)
 	if len(digest) != 40 {
-		log.Printf("invalid id: %v", digest)
+		slog.Debug("invalid id", "id", digest)
 		w.WriteHeader(http.StatusBadRequest)
 	} else {
 		ok, err := svc.shardedPathExists(digest)
@@ -89,9 +149,10 @@ func (svc *WebSpoolService) SpoolStatusHandler(w http.ResponseWriter, r *http.Re
 
 // BlobHandler receives PDF blobs and saves them on disk.
 func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) {
+	started := time.Now()
 	tmpf, err := os.CreateTemp("", tempFilePattern)
 	if err != nil {
-		log.Printf("failed to create temporary file: %v", err)
+		slog.Error("failed to create temporary file", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -102,17 +163,17 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	)
 	n, err := io.Copy(mw, r.Body)
 	if err != nil {
-		log.Printf("failed to drain response body: %v", err)
+		slog.Error("failed to drain response body", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if err := tmpf.Close(); err != nil {
-		log.Printf("failed to close temporary file: %v", err)
+		slog.Error("failed to close temporary file", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if n != r.ContentLength {
-		log.Printf("content length mismatch, got %v, expected %v", n, r.ContentLength)
+		slog.Error("content length mismatch", "n", n, "length", r.ContentLength)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -122,50 +183,51 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	)
 	dst, err := svc.shardedPath(digest, true)
 	if err != nil {
-		log.Printf("could not determine sharded path: %v", err)
+		slog.Error("could not determine sharded path", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	ok, err := svc.shardedPathExists(digest)
 	if err != nil {
-		log.Printf("could not determine sharded path: %v", err)
+		slog.Error("could not determine sharded path", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if ok {
 		f, err := os.Open(dst)
 		if err != nil {
-			log.Printf("already uploaded, but file not readable: %v", err)
+			slog.Error("already uploaded, but file not readable", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		defer f.Close()
 		fi, err := f.Stat()
 		if err != nil {
-			log.Printf("failed to stat file: %v", err)
+			slog.Error("failed to stat file", "err", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		if r.ContentLength == fi.Size() {
-			log.Printf("found existing file in spool dir, skipping, spool url: %v", spoolURL)
+			slog.Debug("found existing file in spool dir, skipping", "url", spoolURL)
 			w.Header().Add("Location", spoolURL)
 			w.WriteHeader(http.StatusAccepted)
 			return
 		}
-		log.Printf("warning: found existing file, but size differ, overwriting")
+		slog.Debug("warning: found existing file, but size differ, overwriting")
 	}
 	if err := os.Rename(tmpf.Name(), dst); err != nil {
-		log.Printf("failed to rename: %v", err)
+		slog.Error("failed to rename", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.Printf("spooled file to: %v, spool url: %v", dst, spoolURL)
+	slog.Debug("spooled file", "file", dst, "url", spoolURL, "t", time.Since(started))
 	w.Header().Add("Location", spoolURL)
 	w.WriteHeader(http.StatusAccepted)
 }
 
 func main() {
 	flag.Parse()
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 	svc := &WebSpoolService{
 		Dir: *spoolDir,
 	}
@@ -176,14 +238,15 @@ func main() {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})
-	r.HandleFunc("/spool", svc.BlobHandler)
-	r.HandleFunc("/spool/{id}", svc.SpoolStatusHandler)
+	r.HandleFunc("/spool", svc.BlobHandler).Methods("POST")
+	r.HandleFunc("/spool", svc.SpoolListHandler).Methods("GET")
+	r.HandleFunc("/spool/{id}", svc.SpoolStatusHandler).Methods("GET")
 	srv := &http.Server{
 		Handler:      r,
 		Addr:         *listenAddr,
 		WriteTimeout: *timeout,
 		ReadTimeout:  *timeout,
 	}
-	log.Printf("starting server at: %v", srv.Addr)
+	slog.Info("starting server at", "hostport", srv.Addr)
 	log.Fatal(srv.ListenAndServe())
 }
