@@ -25,15 +25,6 @@ var (
 	receipt, not successful postprocessing, which may take more time."}`
 )
 
-type DeriveRunner struct {
-	SpoolDir string
-	// TODO: add storage locations
-}
-
-// Run runs all derivations and on success removes the file from the spool
-// directory.
-func (r *DeriveRunner) Run() error { return nil }
-
 // RunnerService calls a few external tools on the received payload.
 type RunnerService struct {
 	SpoolDir string
