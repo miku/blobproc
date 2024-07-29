@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-TARGETS := webspoold
+TARGETS := webspoold spoolrun
 
 .PHONY: all
 all: $(TARGETS)
