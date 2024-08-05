@@ -1,3 +1,4 @@
+// webspoold takes binary blobs via HTTP POST and save them to disk.
 package main
 
 import (
@@ -26,7 +27,7 @@ var (
 	listenAddr = flag.String("addr", "0.0.0.0:8000", "host port to listen on")
 	timeout    = flag.Duration("T", 15*time.Second, "server timeout")
 
-	banner = `{"id": "blobrun",
+	banner = `{"id": "webspool",
 	"about": "Send your PDF payload to %s/spool - a 200 OK status only confirms
 	receipt, not successful postprocessing, which may take more time."}`
 )
@@ -147,7 +148,7 @@ func (svc *WebSpoolService) SpoolStatusHandler(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// BlobHandler receives PDF blobs and saves them on disk.
+// BlobHandler receives binary (PDF) blobs and saves them on disk.
 func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) {
 	started := time.Now()
 	tmpf, err := os.CreateTemp("", tempFilePattern)
