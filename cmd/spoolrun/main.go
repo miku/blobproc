@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"log/slog"
@@ -17,10 +19,14 @@ import (
 	"github.com/minio/minio-go/v7"
 )
 
+var ErrFileTooLarge = errors.New("file too large")
+
 var (
 	spoolDir          = flag.String("spool", path.Join(xdg.DataHome, "/webspool/spool"), "")
 	pidFile           = flag.String("pidfile", path.Join(xdg.RuntimeDir, "webspool.pid"), "pidfile")
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq")
+	consolidateMode   = flag.Bool("consolidate-mode", false, "consolidate mode")
+	maxGrobidFilesize = flag.Int("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
 	s3                = flag.String("s3", "", "S3 endpoint") // TODO: access key in env
 	s3AccessKey       = flag.String("s3-access-key", "", "S3 access key")
 	s3SecretKey       = flag.String("s3-secret-key", "", "S3 secret key")
@@ -35,10 +41,69 @@ type Runner struct {
 	S3Client *minio.Client
 }
 
+// ProcessFulltextResult is a wrapped grobid response.
+type ProcessFulltextResult struct {
+	Statuscode int
+	Status     string
+	Error      error
+	TEIXML     string
+}
+
+// processFulltext returns
+func (sr *Runner) processFulltext(filename string) (*ProcessFulltextResult, error) {
+	fi, err := os.Stat(filename)
+	if err != nil {
+		return nil, err
+	}
+	if fi.Size() > *maxGrobidFilesize {
+		return &ProcessFulltextResult{
+			Status: "blob-too-large", // TODO: not sure we need that immediately
+			Error:  ErrFileTooLarge,
+		}, ErrFileTooLarge
+	}
+	opts := &grobidclient.Options{
+		ConsolidateHeader:      *consolidateMode,
+		ConsolidateCitations:   false, // "too expensive for now"
+		IncludeRawCitations:    true,
+		IncluseRawAffiliations: true,
+		TEICoordinates:         []string{"ref", "figure", "persName", "formula", "biblStruct"},
+		SegmentSentences:       true,
+	}
+	result, err := sr.Grobid.ProcessPDF(filename, "processFulltextDocument", opts)
+	if err != nil {
+		return &ProcessFulltextResult{
+			Status:     "grobid-error",
+			StatusCode: result.StatusCode,
+			Error:      err,
+		}, err
+	}
+	if result.StatusCode == 200 {
+		if len(result.Body) > 12_000_000 {
+			err := fmt.Errorf("response XML too large: %d", len(result.Body))
+			return &ProcessFulltextResult{
+				Status: "error",
+				Error:  err,
+			}, err
+		}
+		return ProcessFulltextResult{
+			Status:     "success",
+			StatusCode: result.StatusCode,
+			TEIXML:     string(result.Body),
+			Error:      nil,
+		}
+	}
+	return ProcessFulltextResult{
+		Status:     "error",
+		StatusCode: result.StatusCode,
+		Error:      fmt.Errorf("body: %v", string(result.Body)),
+	}
+}
+
 func (sr *Runner) RunGrobid(filename string) error {
 	return nil
 }
-func (sr *Runner) RunPdfToText(filename string) error    { return nil }
+func (sr *Runner) RunPdfToText(filename string) error {}
+
 func (sr *Runner) RunPdfThumbnail(filename string) error { return nil }
 
 func main() {
