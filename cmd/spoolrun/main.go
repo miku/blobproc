@@ -26,7 +26,7 @@ var (
 	pidFile           = flag.String("pidfile", path.Join(xdg.RuntimeDir, "webspool.pid"), "pidfile")
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq")
 	consolidateMode   = flag.Bool("consolidate-mode", false, "consolidate mode")
-	maxGrobidFilesize = flag.Int("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
+	maxGrobidFilesize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
 	s3                = flag.String("s3", "", "S3 endpoint") // TODO: access key in env
 	s3AccessKey       = flag.String("s3-access-key", "", "S3 access key")
 	s3SecretKey       = flag.String("s3-secret-key", "", "S3 secret key")
@@ -43,13 +43,14 @@ type Runner struct {
 
 // ProcessFulltextResult is a wrapped grobid response.
 type ProcessFulltextResult struct {
-	Statuscode int
+	StatusCode int
 	Status     string
 	Error      error
 	TEIXML     string
 }
 
-// processFulltext returns
+// processFulltext wrap grobid access and returns parsed document or some
+// information about errors.
 func (sr *Runner) processFulltext(filename string) (*ProcessFulltextResult, error) {
 	fi, err := os.Stat(filename)
 	if err != nil {
@@ -85,24 +86,28 @@ func (sr *Runner) processFulltext(filename string) (*ProcessFulltextResult, erro
 				Error:  err,
 			}, err
 		}
-		return ProcessFulltextResult{
+		return &ProcessFulltextResult{
 			Status:     "success",
 			StatusCode: result.StatusCode,
 			TEIXML:     string(result.Body),
 			Error:      nil,
-		}
+		}, nil
 	}
-	return ProcessFulltextResult{
+	return &ProcessFulltextResult{
 		Status:     "error",
 		StatusCode: result.StatusCode,
 		Error:      fmt.Errorf("body: %v", string(result.Body)),
-	}
+	}, nil
 }
 
 func (sr *Runner) RunGrobid(filename string) error {
+	_, err := sr.processFulltext(filename)
+	if err != nil {
+		return err
+	}
 	return nil
 }
-func (sr *Runner) RunPdfToText(filename string) error {}
+func (sr *Runner) RunPdfToText(filename string) error { return nil }
 
 func (sr *Runner) RunPdfThumbnail(filename string) error { return nil }
 
@@ -114,7 +119,7 @@ func main() {
 	}
 	grobid := grobidclient.New(*grobidHost)
 	s3Client, err := minio.New(*s3, &minio.Options{
-		Creds:  credentials.NewStaticV4(*s3AccessKey, s3SecretKey, ""),
+		Creds:  credentials.NewStaticV4(*s3AccessKey, *s3SecretKey, ""),
 		Secure: false,
 	})
 	if err != nil {
@@ -125,7 +130,7 @@ func main() {
 		Grobid:   grobid,
 		S3Client: s3Client,
 	}
-	err := filepath.Walk(*spoolDir, func(path string, info fs.FileInfo, err error) error {
+	err = filepath.Walk(*spoolDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -143,7 +148,7 @@ func main() {
 			return nil
 		}
 		// TODO: write successful result to S3 bucket
-		info, err := runner.s3Client.PutObject(
+		info, err = runner.S3Client.PutObject(
 			context.Background(),
 			"my-bucketname",
 			"my-objectname",
