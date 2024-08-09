@@ -6,7 +6,8 @@ PKGNAME := blobproc
 all: $(TARGETS)
 
 %: cmd/%/main.go
-	go build -o $@ $<
+	# GLIBC version mismatch on deployment target, use CGO_ENABLED=0
+	CGO_ENABLED=0 go build -o $@ $<
 
 .PHONY: clean
 clean:
