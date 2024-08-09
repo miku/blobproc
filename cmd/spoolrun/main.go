@@ -1,10 +1,7 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"flag"
-	"fmt"
 	"io/fs"
 	"log"
 	"log/slog"
@@ -13,13 +10,12 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
+	"github.com/miku/blobrun"
 	"github.com/miku/blobrun/pidfile"
 	"github.com/miku/grobidclient"
-	"github.com/minio/minio-go/pkg/credentials"
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 )
-
-var ErrFileTooLarge = errors.New("file too large")
 
 var (
 	spoolDir          = flag.String("spool", path.Join(xdg.DataHome, "/webspool/spool"), "")
@@ -35,82 +31,6 @@ var (
 	s3ThumbnailBucket = flag.String("s3-thumbnail-bucket", "", "s3 thumbnail bucket")
 )
 
-type Runner struct {
-	SpoolDir string
-	Grobid   *grobidclient.Grobid
-	S3Client *minio.Client
-}
-
-// ProcessFulltextResult is a wrapped grobid response.
-type ProcessFulltextResult struct {
-	StatusCode int
-	Status     string
-	Error      error
-	TEIXML     string
-}
-
-// processFulltext wrap grobid access and returns parsed document or some
-// information about errors.
-func (sr *Runner) processFulltext(filename string) (*ProcessFulltextResult, error) {
-	fi, err := os.Stat(filename)
-	if err != nil {
-		return nil, err
-	}
-	if fi.Size() > *maxGrobidFilesize {
-		return &ProcessFulltextResult{
-			Status: "blob-too-large", // TODO: not sure we need that immediately
-			Error:  ErrFileTooLarge,
-		}, ErrFileTooLarge
-	}
-	opts := &grobidclient.Options{
-		ConsolidateHeader:      *consolidateMode,
-		ConsolidateCitations:   false, // "too expensive for now"
-		IncludeRawCitations:    true,
-		IncluseRawAffiliations: true,
-		TEICoordinates:         []string{"ref", "figure", "persName", "formula", "biblStruct"},
-		SegmentSentences:       true,
-	}
-	result, err := sr.Grobid.ProcessPDF(filename, "processFulltextDocument", opts)
-	if err != nil {
-		return &ProcessFulltextResult{
-			Status:     "grobid-error",
-			StatusCode: result.StatusCode,
-			Error:      err,
-		}, err
-	}
-	if result.StatusCode == 200 {
-		if len(result.Body) > 12_000_000 {
-			err := fmt.Errorf("response XML too large: %d", len(result.Body))
-			return &ProcessFulltextResult{
-				Status: "error",
-				Error:  err,
-			}, err
-		}
-		return &ProcessFulltextResult{
-			Status:     "success",
-			StatusCode: result.StatusCode,
-			TEIXML:     string(result.Body),
-			Error:      nil,
-		}, nil
-	}
-	return &ProcessFulltextResult{
-		Status:     "error",
-		StatusCode: result.StatusCode,
-		Error:      fmt.Errorf("body: %v", string(result.Body)),
-	}, nil
-}
-
-func (sr *Runner) RunGrobid(filename string) error {
-	_, err := sr.processFulltext(filename)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-func (sr *Runner) RunPdfToText(filename string) error { return nil }
-
-func (sr *Runner) RunPdfThumbnail(filename string) error { return nil }
-
 func main() {
 	flag.Parse()
 	if err := pidfile.Write(*pidFile, os.Getpid()); err != nil {
@@ -125,10 +45,12 @@ func main() {
 	if err != nil {
 		log.Fatal("cannot access S3: %v", err)
 	}
-	runner := &Runner{
-		SpoolDir: *spoolDir,
-		Grobid:   grobid,
-		S3Client: s3Client,
+	runner := &blobrun.Runner{
+		SpoolDir:          *spoolDir,
+		Grobid:            grobid,
+		MaxGrobidFileSize: *maxGrobidFilesize,
+		ConsolidateMode:   *consolidateMode,
+		S3Client:          s3Client,
 	}
 	err = filepath.Walk(*spoolDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -138,26 +60,11 @@ func main() {
 			return nil
 		}
 		slog.Info("processing", "path", path)
-		result, err := runner.Grobid.ProcessPDF(path, "processFulltextDocument", nil)
-		if err != nil {
-			slog.Warn("grobid pdf parsing failed", "err", err)
-			return nil
+
+		if err := runner.RunGrobid(path); err != nil {
+			slog.Error("grobid failed", "err", err)
 		}
-		if result.StatusCode != 200 {
-			slog.Warn("grobid pdf parsing resulted in %d, skipping", "statuscode", result.StatusCode)
-			return nil
-		}
-		// TODO: write successful result to S3 bucket
-		info, err = runner.S3Client.PutObject(
-			context.Background(),
-			"my-bucketname",
-			"my-objectname",
-			object,
-			objectStat.Size(),
-			minio.PutObjectOptions{ContentType: "application/octet-stream"})
-		if err != nil {
-			log.Fatalln(err)
-		}
+
 		return nil
 	})
 	if err != nil {
