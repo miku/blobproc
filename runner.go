@@ -3,15 +3,21 @@ package blobrun
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/miku/grobidclient"
 	"github.com/minio/minio-go/v7"
 )
 
 var ErrFileTooLarge = errors.New("file too large")
+var ErrInvalidHash = errors.New("invalid hash")
+
+var DefaultBucket = "default" // TODO: what is it?
 
 // BlobS3 slightly wraps I/O around our S3 store.
 type BlobS3 struct {
@@ -35,11 +41,43 @@ type PutBlobResponse struct {
 	ObjectPath string
 }
 
+// blobPath panics, if the sha1hex is not a 40 byte hex digest. Extension ext
+// needs to include a "." (dot).
 func (b *BlobS3) blobPath(folder, sha1hex, ext, prefix string) string {
-	return ""
+	if len(sha1hex) != nil {
+		panic("invalid sha1hex, want 40 bytes, got %v", len(sha1hex))
+	}
+	return fmt.Sprintf("%s%s/%s/%s/%s%s",
+		prefix, folder, sha1hex[0:2], sha1hex[2:4], sha1hex, ext)
 }
 
 func (b *BlobS3) putBlob(req *PutBlobRequest) (*PutBlobResponse, error) {
+	if len(req.SHA1Hex) != 40 {
+		return nil, ErrInvalidHash
+	}
+	if req.SHA1Hex == "" {
+		h := sha1.New()
+		_, err := io.Copy(h, bytes.NewReader(req.Blob))
+		if err != nil {
+			return nil, err
+		}
+		req.SHA1Hex = fmt.Sprintf("%x", h.Sum(nil))
+	}
+	objPath := blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)
+	if req.Bucket == "" {
+		req.Bucket = DefaultBucket
+	}
+	contentType := "application/octet-stream"
+	if strings.HasSuffix(ext, ".xml") {
+	}
+	if strings.HasSuffix(ext, ".png") {
+	}
+	if strings.HasSuffix(ext, ".jpg") || strings.HasSuffix(ext, ".jpeg") {
+	}
+	if strings.HasSuffix(ext, ".txt") {
+	}
+	// TODO: minio put object
+
 	return nil, nil
 }
 
