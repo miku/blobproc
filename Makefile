@@ -11,6 +11,7 @@ all: $(TARGETS)
 .PHONY: clean
 clean:
 	rm -f $(TARGETS)
+	rm -f $(PKGNAME)_*.deb
 
 
 .PHONY: update-all-deps
