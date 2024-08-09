@@ -1,4 +1,4 @@
-# blobrun
+# BLOBPROC
 
 status: not implemented, just a sketch and notes
 
