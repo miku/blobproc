@@ -1,4 +1,4 @@
-package blobrun
+package blobproc
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 
@@ -44,8 +45,8 @@ type PutBlobResponse struct {
 // blobPath panics, if the sha1hex is not a 40 byte hex digest. Extension ext
 // needs to include a "." (dot).
 func (b *BlobS3) blobPath(folder, sha1hex, ext, prefix string) string {
-	if len(sha1hex) != nil {
-		panic("invalid sha1hex, want 40 bytes, got %v", len(sha1hex))
+	if len(sha1hex) != 40 {
+		panic(fmt.Sprintf("invalid sha1hex, want 40 bytes, got %v", len(sha1hex)))
 	}
 	return fmt.Sprintf("%s%s/%s/%s/%s%s",
 		prefix, folder, sha1hex[0:2], sha1hex[2:4], sha1hex, ext)
@@ -63,18 +64,20 @@ func (b *BlobS3) putBlob(req *PutBlobRequest) (*PutBlobResponse, error) {
 		}
 		req.SHA1Hex = fmt.Sprintf("%x", h.Sum(nil))
 	}
-	objPath := blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)
+	objPath := b.blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)
+	log.Printf("TODO: objPath: %v", objPath)
 	if req.Bucket == "" {
 		req.Bucket = DefaultBucket
 	}
-	contentType := "application/octet-stream"
-	if strings.HasSuffix(ext, ".xml") {
+	// TODO: contentType := "application/octet-stream"
+	if strings.HasSuffix(req.Ext, ".xml") {
+		// TODO: contentType = "application/xml"
 	}
-	if strings.HasSuffix(ext, ".png") {
+	if strings.HasSuffix(req.Ext, ".png") {
 	}
-	if strings.HasSuffix(ext, ".jpg") || strings.HasSuffix(ext, ".jpeg") {
+	if strings.HasSuffix(req.Ext, ".jpg") || strings.HasSuffix(req.Ext, ".jpeg") {
 	}
-	if strings.HasSuffix(ext, ".txt") {
+	if strings.HasSuffix(req.Ext, ".txt") {
 	}
 	// TODO: minio put object
 

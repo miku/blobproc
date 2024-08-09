@@ -20,6 +20,7 @@ import (
 
 	"github.com/adrg/xdg"
 	"github.com/gorilla/mux"
+	"github.com/miku/blobproc"
 )
 
 var (
@@ -30,6 +31,7 @@ var (
 	banner = `{"id": "webspool",
 	"about": "Send your PDF payload to %s/spool - a 200 OK status only confirms
 	receipt, not successful postprocessing, which may take more time."}`
+	showVersion = flag.Bool("v", false, "show version")
 )
 
 var errShortName = errors.New("short name")
@@ -228,6 +230,10 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 
 func main() {
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(blobproc.Version)
+		os.Exit(0)
+	}
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 	svc := &WebSpoolService{
 		Dir: *spoolDir,

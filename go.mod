@@ -1,4 +1,4 @@
-module github.com/miku/blobrun
+module github.com/miku/blobproc
 
 go 1.22.5
 
