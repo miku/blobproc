@@ -10,6 +10,8 @@ case: Receiving scholarly PDF documents from heritrix, then running and storing 
 
 This service does not implement any generic features for now.
 
+![](static/00596.png)
+
 ## Mode of operation
 
 blobrun saves all incoming files in an *spool* folder and then returns, so this
