@@ -41,3 +41,7 @@ For S3, the key will be the content SHA1.
 
 Given a cli tool to fetch a list of PDFs from PB, we can complete missing
 derivations.
+
+----
+
+Image credit: [SD](https://github.com/CompVis/stable-diffusion)
