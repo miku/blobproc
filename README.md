@@ -1,15 +1,12 @@
 # BLOBPROC
 
-status: not implemented, just a sketch and notes
+status: testing
 
-For a constant influx of PDF files, we wanted to have a tiny, event-based
-component that would apply processing to those files, using a hotfolder.
+For an influx of PDF files, we wanted to have a small, event-based component
+that would apply processing to those files, using a hotfolder.
 
-
-
-
-A webhook server that can receive raw bytes and execute commands. Original use
-case: Receiving scholarly PDF documents and running a few derivations on them.
+The server receives raw bytes in the HTTP body, stores them in a folder. Another processes regularly scans this folder, and executes commands. Original use
+case: Receiving scholarly PDF documents from heritrix, then running and storing derivations.
 
 This service does not implement any generic features for now.
 
@@ -23,8 +20,7 @@ A periodic scan of the *spool* directory will pick up new files, and
 will process them, e.g. send the content to grobid, run pdftotext, and similar.
 
 These derivations can fail and retried, there is not time pressure, as long as
-the "spool" directory does not exceed a given limit, e.g. 80% of the free space
-on the disk.
+the "spool" directory does not exceed a given limit.
 
 Once all derivations ran successfully, the file is deleted from the "spool"
 directory. If the server dies and comes back up, the files in the "spool"
