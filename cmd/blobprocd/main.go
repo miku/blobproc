@@ -1,4 +1,4 @@
-// webspoold takes binary blobs via HTTP POST and save them to disk.
+// blobprocd takes binary blobs via HTTP POST and save them to disk.
 package main
 
 import (
