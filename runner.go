@@ -31,7 +31,7 @@ type ProcessFulltextResult struct {
 	Status     string
 	Error      error
 	TEIXML     string
-	SHA1       string // SHA1 of the originating PDF
+	SHA1       string // SHA1 of the originating PDF, not the TEIXML
 }
 
 // processFulltext wrap grobid access and returns parsed document or some
@@ -64,15 +64,15 @@ func (runner *Runner) processFulltext(filename string) (*ProcessFulltextResult, 
 			SHA1:       result.SHA1,
 		}, err
 	}
-	if result.StatusCode == 200 {
-		if len(result.Body) > 12_000_000 {
-			err := fmt.Errorf("response XML too large: %d", len(result.Body))
-			return &ProcessFulltextResult{
-				Status: "error",
-				Error:  err,
-				SHA1:   result.SHA1,
-			}, err
-		}
+	switch {
+	case result.StatusCode == 200 && len(result.Body) > 12_000_000:
+		err := fmt.Errorf("response XML too large: %d", len(result.Body))
+		return &ProcessFulltextResult{
+			Status: "error",
+			Error:  err,
+			SHA1:   result.SHA1,
+		}, err
+	case result.StatusCode == 200:
 		return &ProcessFulltextResult{
 			Status:     "success",
 			StatusCode: result.StatusCode,
@@ -80,12 +80,13 @@ func (runner *Runner) processFulltext(filename string) (*ProcessFulltextResult, 
 			Error:      nil,
 			SHA1:       result.SHA1,
 		}, nil
+	default:
+		return &ProcessFulltextResult{
+			Status:     "error",
+			StatusCode: result.StatusCode,
+			Error:      fmt.Errorf("body: %v", string(result.Body)),
+		}, nil
 	}
-	return &ProcessFulltextResult{
-		Status:     "error",
-		StatusCode: result.StatusCode,
-		Error:      fmt.Errorf("body: %v", string(result.Body)),
-	}, nil
 }
 
 func (sr *Runner) RunGrobid(filename string) error {
