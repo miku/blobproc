@@ -69,9 +69,6 @@ func blobPath(folder, sha1hex, ext, prefix string) string {
 
 // putBlob takes a data to be put into S3 and saves it.
 func (wrap *WrapS3) putBlob(req *BlobRequestOptions) (*PutBlobResponse, error) {
-	if len(req.SHA1Hex) != 40 {
-		return nil, ErrInvalidHash
-	}
 	if req.SHA1Hex == "" {
 		h := sha1.New()
 		_, err := io.Copy(h, bytes.NewReader(req.Blob))
@@ -80,9 +77,22 @@ func (wrap *WrapS3) putBlob(req *BlobRequestOptions) (*PutBlobResponse, error) {
 		}
 		req.SHA1Hex = fmt.Sprintf("%x", h.Sum(nil))
 	}
+	if len(req.SHA1Hex) != 40 {
+		return nil, ErrInvalidHash
+	}
 	objPath := blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)
 	if req.Bucket == "" {
 		req.Bucket = DefaultBucket
+	}
+	ok, err := wrap.Client.BucketExists(context.Background(), req.Bucket)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		opts := minio.MakeBucketOptions{}
+		if err := wrap.Client.MakeBucket(context.TODO(), req.Bucket, opts); err != nil {
+			return nil, err
+		}
 	}
 	contentType := "application/octet-stream"
 	if strings.HasSuffix(req.Ext, ".xml") {
@@ -100,14 +110,20 @@ func (wrap *WrapS3) putBlob(req *BlobRequestOptions) (*PutBlobResponse, error) {
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
 	}
-	_, err := wrap.Client.PutObject(context.TODO(), req.Bucket, objPath,
+	info, err := wrap.Client.PutObject(context.TODO(), req.Bucket, objPath,
 		bytes.NewReader(req.Blob), int64(len(req.Blob)), opts)
 	if err != nil {
 		return nil, err
 	}
+	if info.Bucket != req.Bucket {
+		return nil, fmt.Errorf("[put] bucket mismatch: %v", info.Bucket)
+	}
+	if info.Key != objPath {
+		return nil, fmt.Errorf("[put] key mismatch: %v", info.Key)
+	}
 	return &PutBlobResponse{
-		Bucket:     req.Bucket,
-		ObjectPath: objPath,
+		Bucket:     info.Bucket,
+		ObjectPath: info.Key,
 	}, nil
 }
 
@@ -117,8 +133,7 @@ func (wrap *WrapS3) getBlob(req *BlobRequestOptions) ([]byte, error) {
 	if req.Bucket == "" {
 		req.Bucket = DefaultBucket
 	}
-	opts := minio.GetObjectOptions{}
-	object, err := wrap.Client.GetObject(context.TODO(), req.Bucket, objPath, opts)
+	object, err := wrap.Client.GetObject(context.TODO(), req.Bucket, objPath, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err
 	}

@@ -64,46 +64,92 @@ func TestBlobPath(t *testing.T) {
 }
 
 func TestPutGetObject(t *testing.T) {
-	skipNoDocker(t)
-	if testing.Short() {
-		t.Skip("skipping testcontainer based tests in short mode")
+	var hostPort string
+	switch os.Getenv("TEST_LOCAL_MINIO") {
+	case "":
+		skipNoDocker(t)
+		if testing.Short() {
+			t.Skip("skipping testcontainer based tests in short mode")
+		}
+		ctx := context.Background()
+		req := testcontainers.ContainerRequest{
+			Image: "quay.io/minio/minio:latest",
+			ExposedPorts: []string{
+				"9000/tcp",
+				"9001/tcp",
+			},
+			WaitingFor: wait.ForListeningPort("9000/tcp"),
+			Cmd: []string{
+				"minio",
+				"server",
+				"/tmp",
+			},
+		}
+		minioC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+			ContainerRequest: req,
+			Started:          true,
+		})
+		if err != nil {
+			t.Fatalf("could not start minio: %s", err)
+		}
+		defer func() {
+			if err := minioC.Terminate(ctx); err != nil {
+				t.Fatalf("could not stop minio: %s", err)
+			}
+		}()
+		ip, err := minioC.Host(ctx)
+		if err != nil {
+			t.Fatalf("testcontainer: count not get host: %v", err)
+		}
+		port, err := minioC.MappedPort(ctx, "9000")
+		if err != nil {
+			t.Fatalf("testcontainer: count not get port: %v", err)
+		}
+		hostPort = fmt.Sprintf("%s:%s", ip, port.Port())
+		t.Logf("starting e2e test, using minio container %s running at %v", minioC.GetContainerID(), hostPort)
+	default:
+		hostPort = fmt.Sprintf("0.0.0.0:9000")
+		t.Logf("starting e2e test, using local minio running at %v", hostPort)
 	}
-	ctx := context.Background()
-	req := testcontainers.ContainerRequest{
-		Image: "quay.io/minio/minio:latest",
-		ExposedPorts: []string{
-			"9000/tcp",
-			"9001/tcp",
-		},
-		WaitingFor: wait.ForListeningPort("9000/tcp"),
-		Cmd: []string{
-			"minio",
-			"server",
-			"/tmp",
-		},
-	}
-	minioC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
+	wrap, err := NewWrapS3(hostPort, &WrapS3Options{
+		AccessKey:     "minioadmin",
+		SecretKey:     "minioadmin",
+		DefaultBucket: "default",
+		UseSSL:        false,
 	})
 	if err != nil {
-		t.Fatalf("could not start minio: %s", err)
+		t.Fatalf("got %v, want nil", err)
 	}
-	defer func() {
-		if err := minioC.Terminate(ctx); err != nil {
-			t.Fatalf("could not stop minio: %s", err)
-		}
-	}()
-	ip, err := minioC.Host(ctx)
+	opts := &BlobRequestOptions{
+		Folder:  "f",
+		SHA1Hex: "", // should be calculated if not given
+		Blob:    []byte("hello, world!"),
+		Prefix:  "",
+		Ext:     "",
+	}
+	resp, err := wrap.putBlob(opts)
 	if err != nil {
-		t.Fatalf("testcontainer: count not get host: %v", err)
+		t.Fatalf("putBlob failed: %v", err)
 	}
-	port, err := minioC.MappedPort(ctx, "9000")
+	if want := "f/1f/09/1f09d30c707d53f3d16c530dd73d70a6ce7596a9"; resp.ObjectPath != want {
+		t.Fatalf("[put] got %v, want %v", resp.ObjectPath, want)
+	} else {
+		t.Logf("successfully saved blob: %v", resp.ObjectPath)
+	}
+	opts = &BlobRequestOptions{
+		Folder:  "f",
+		SHA1Hex: "1f09d30c707d53f3d16c530dd73d70a6ce7596a9",
+		Prefix:  "",
+		Ext:     "",
+	}
+	b, err := wrap.getBlob(opts)
 	if err != nil {
-		t.Fatalf("testcontainer: count not get port: %v", err)
+		t.Fatalf("getBlob failed: %v", err)
 	}
-	hostPort := fmt.Sprintf("http://%s:%s", ip, port.Port())
-	t.Logf("starting e2e test, using minio container running at %v", hostPort)
+	if want := "hello, world!"; string(b) != want {
+		t.Fatalf("[get] got %v, want %v", string(b), want)
+	}
+	t.Logf("successfully retrieved blob: %v", resp.ObjectPath)
 }
 
 func skipNoDocker(t *testing.T) {
