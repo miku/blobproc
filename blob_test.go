@@ -1,6 +1,17 @@
 package blobproc
 
-import "testing"
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"os/user"
+	"strings"
+	"testing"
+
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
 
 func TestBlobPath(t *testing.T) {
 	var cases = []struct {
@@ -49,5 +60,82 @@ func TestBlobPath(t *testing.T) {
 		if result != c.result {
 			t.Fatalf("[%s] got %v, want %v", c.about, result, c.result)
 		}
+	}
+}
+
+func TestPutGetObject(t *testing.T) {
+	skipNoDocker(t)
+	if testing.Short() {
+		t.Skip("skipping testcontainer based tests in short mode")
+	}
+	ctx := context.Background()
+	req := testcontainers.ContainerRequest{
+		Image: "quay.io/minio/minio:latest",
+		ExposedPorts: []string{
+			"9000/tcp",
+			"9001/tcp",
+		},
+		WaitingFor: wait.ForListeningPort("9000/tcp"),
+		Cmd: []string{
+			"minio",
+			"server",
+			"/tmp",
+		},
+	}
+	minioC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		t.Fatalf("could not start minio: %s", err)
+	}
+	defer func() {
+		if err := minioC.Terminate(ctx); err != nil {
+			t.Fatalf("could not stop minio: %s", err)
+		}
+	}()
+	ip, err := minioC.Host(ctx)
+	if err != nil {
+		t.Fatalf("testcontainer: count not get host: %v", err)
+	}
+	port, err := minioC.MappedPort(ctx, "9000")
+	if err != nil {
+		t.Fatalf("testcontainer: count not get port: %v", err)
+	}
+	hostPort := fmt.Sprintf("http://%s:%s", ip, port.Port())
+	t.Logf("starting e2e test, using minio container running at %v", hostPort)
+}
+
+func skipNoDocker(t *testing.T) {
+	noDocker := false
+	cmd := exec.Command("systemctl", "is-active", "docker")
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		noDocker = true
+	}
+	if strings.TrimSpace(string(b)) != "active" {
+		noDocker = true
+	}
+	if !noDocker {
+		// We found some docker.
+		return
+	}
+	// Otherwise, try podman.
+	_, err = exec.LookPath("podman")
+	if err == nil {
+		t.Logf("podman detected")
+		// DOCKER_HOST=unix:///run/user/$UID/podman/podman.sock
+		usr, err := user.Current()
+		if err != nil {
+			t.Logf("cannot get UID, set DOCKER_HOST manually")
+		} else {
+			sckt := fmt.Sprintf("unix:///run/user/%v/podman/podman.sock", usr.Uid)
+			os.Setenv("DOCKER_HOST", sckt)
+			t.Logf("set DOCKER_HOST to %v", sckt)
+		}
+		noDocker = false
+	}
+	if noDocker {
+		t.Skipf("docker not installed or not running")
 	}
 }
