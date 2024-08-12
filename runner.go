@@ -24,7 +24,7 @@ type Runner struct {
 	Grobid            *grobidclient.Grobid // Grobid client wraps grobid service API access.
 	MaxGrobidFileSize int64                // Do not send too large blobs to grobid.
 	ConsolidateMode   bool                 // ConsolidateMode pass through argument to grobid.
-	S3Client          *minio.Client        // S3Client wraps access to S3/seaweedfs.
+	S3Wrapper         *WrapS3              // Wraps access to S3/seaweedfs.
 }
 
 // ProcessFulltextResult is a wrapped grobid response. TODO: we may just use
@@ -92,7 +92,13 @@ func (sr *Runner) RunGrobid(filename string) error {
 	if err != nil {
 		return err
 	}
-	// Put result into bucket
+	opts := BlobRequestOptions{
+		SHA1Hex: "", // TODO: SHA1 of the PDF
+		Folder:  "grobid",
+		Ext:     ".tei.xml",
+		Bucket:  "sandcrawler",
+	}
+	sr.S3Wrapper.putBlob()
 	_, err = sr.S3Client.PutObject(
 		context.TODO(),
 		"my-bucketname",
