@@ -2,17 +2,17 @@ package blobproc
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-// WrapS3 slightly wraps I/O around our S3 store.
+// WrapS3 slightly wraps I/O around our S3 store with convenience methods.
 type WrapS3 struct {
 	Client *minio.Client
 }
@@ -25,6 +25,7 @@ type WrapS3Options struct {
 	UseSSL        bool
 }
 
+// NewWrapS3 creates a new, slim wrapper around S3.
 func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 	client, err := minio.New(endpoint,
 		&minio.Options{
@@ -40,8 +41,8 @@ func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 	}, nil
 }
 
-// PutBlobRequest wraps the options to put a blob into storage.
-type PutBlobRequest struct {
+// BlobRequestOptions wraps the options to put a blob into storage.
+type BlobRequestOptions struct {
 	Folder  string
 	Blob    []byte
 	SHA1Hex string
@@ -57,7 +58,7 @@ type PutBlobResponse struct {
 }
 
 // blobPath returns the path for a given folder, content hash, extension and
-// prefix.
+// prefix. Panic if sha1hex is not a length 40 string.
 func blobPath(folder, sha1hex, ext, prefix string) string {
 	if len(ext) > 0 && !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
@@ -67,7 +68,7 @@ func blobPath(folder, sha1hex, ext, prefix string) string {
 }
 
 // putBlob takes a data to be put into S3 and saves it.
-func (wrap *WrapS3) putBlob(req *PutBlobRequest) (*PutBlobResponse, error) {
+func (wrap *WrapS3) putBlob(req *BlobRequestOptions) (*PutBlobResponse, error) {
 	if len(req.SHA1Hex) != 40 {
 		return nil, ErrInvalidHash
 	}
@@ -96,12 +97,30 @@ func (wrap *WrapS3) putBlob(req *PutBlobRequest) (*PutBlobResponse, error) {
 	if strings.HasSuffix(req.Ext, ".txt") {
 		contentType = "text/plain"
 	}
-	// TODO: minio put object
-	log.Println(objPath, contentType)
-	// wrap.Client.PutObject() // TODO: minio client
-	return nil, nil
+	opts := minio.PutObjectOptions{
+		ContentType: contentType,
+	}
+	_, err := wrap.Client.PutObject(context.TODO(), req.Bucket, objPath,
+		bytes.NewReader(req.Blob), int64(len(req.Blob)), opts)
+	if err != nil {
+		return nil, err
+	}
+	return &PutBlobResponse{
+		Bucket:     req.Bucket,
+		ObjectPath: objPath,
+	}, nil
 }
 
-func (b *WrapS3) getBlob(req *PutBlobRequest) ([]byte, error) {
-	return nil, nil
+// getBlob returns the object bytes given a blob request.
+func (wrap *WrapS3) getBlob(req *BlobRequestOptions) ([]byte, error) {
+	objPath := blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)
+	if req.Bucket == "" {
+		req.Bucket = DefaultBucket
+	}
+	opts := minio.GetObjectOptions{}
+	object, err := wrap.Client.GetObject(context.TODO(), req.Bucket, objPath, opts)
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(object)
 }

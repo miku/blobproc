@@ -9,6 +9,10 @@ all: $(TARGETS)
 	# GLIBC version mismatch on deployment target, use CGO_ENABLED=0
 	CGO_ENABLED=0 go build -o $@ $<
 
+.PHONY: test
+test:
+	go test -v -cover ./...
+
 .PHONY: clean
 clean:
 	rm -f $(TARGETS)

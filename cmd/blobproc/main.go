@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 
 	"github.com/adrg/xdg"
-	"github.com/miku/blobrun"
-	"github.com/miku/blobrun/pidfile"
+	"github.com/miku/blobproc"
+	"github.com/miku/blobproc/pidfile"
 	"github.com/miku/grobidclient"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -43,9 +43,9 @@ func main() {
 		Secure: false,
 	})
 	if err != nil {
-		log.Fatal("cannot access S3: %v", err)
+		log.Fatalf("cannot access S3: %v", err)
 	}
-	runner := &blobrun.Runner{
+	runner := &blobproc.Runner{
 		SpoolDir:          *spoolDir,
 		Grobid:            grobid,
 		MaxGrobidFileSize: *maxGrobidFilesize,
@@ -60,11 +60,9 @@ func main() {
 			return nil
 		}
 		slog.Info("processing", "path", path)
-
 		if err := runner.RunGrobid(path); err != nil {
 			slog.Error("grobid failed", "err", err)
 		}
-
 		return nil
 	})
 	if err != nil {
