@@ -13,8 +13,6 @@ import (
 	"github.com/miku/blobproc"
 	"github.com/miku/blobproc/pidfile"
 	"github.com/miku/grobidclient"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 var (
@@ -38,9 +36,12 @@ func main() {
 		os.Exit(1)
 	}
 	grobid := grobidclient.New(*grobidHost)
-	s3Client, err := minio.New(*s3, &minio.Options{
-		Creds:  credentials.NewStaticV4(*s3AccessKey, *s3SecretKey, ""),
-		Secure: false,
+
+	s3wrapper, err := blobproc.NewWrapS3(*s3, &blobproc.WrapS3Options{
+		AccessKey:     *s3AccessKey,
+		SecretKey:     *s3SecretKey,
+		DefaultBucket: "sandcrawler",
+		UseSSL:        false,
 	})
 	if err != nil {
 		log.Fatalf("cannot access S3: %v", err)
@@ -50,7 +51,8 @@ func main() {
 		Grobid:            grobid,
 		MaxGrobidFileSize: *maxGrobidFilesize,
 		ConsolidateMode:   *consolidateMode,
-		S3Client:          s3Client,
+		S3Wrapper:         s3wrapper,
+		// TODO: will need to pass the bucket names
 	}
 	err = filepath.Walk(*spoolDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {

@@ -1,14 +1,11 @@
 package blobproc
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/miku/grobidclient"
-	"github.com/minio/minio-go/v7"
 )
 
 var (
@@ -34,6 +31,7 @@ type ProcessFulltextResult struct {
 	Status     string
 	Error      error
 	TEIXML     string
+	SHA1       string // SHA1 of the originating PDF
 }
 
 // processFulltext wrap grobid access and returns parsed document or some
@@ -63,6 +61,7 @@ func (runner *Runner) processFulltext(filename string) (*ProcessFulltextResult, 
 			Status:     "grobid-error",
 			StatusCode: result.StatusCode,
 			Error:      err,
+			SHA1:       result.SHA1,
 		}, err
 	}
 	if result.StatusCode == 200 {
@@ -71,6 +70,7 @@ func (runner *Runner) processFulltext(filename string) (*ProcessFulltextResult, 
 			return &ProcessFulltextResult{
 				Status: "error",
 				Error:  err,
+				SHA1:   result.SHA1,
 			}, err
 		}
 		return &ProcessFulltextResult{
@@ -78,6 +78,7 @@ func (runner *Runner) processFulltext(filename string) (*ProcessFulltextResult, 
 			StatusCode: result.StatusCode,
 			TEIXML:     string(result.Body),
 			Error:      nil,
+			SHA1:       result.SHA1,
 		}, nil
 	}
 	return &ProcessFulltextResult{
@@ -98,14 +99,8 @@ func (sr *Runner) RunGrobid(filename string) error {
 		Ext:     ".tei.xml",
 		Bucket:  "sandcrawler",
 	}
-	sr.S3Wrapper.putBlob()
-	_, err = sr.S3Client.PutObject(
-		context.TODO(),
-		"my-bucketname",
-		"my-objectname",
-		bytes.NewReader(nil),
-		0,
-		minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	sr.S3Wrapper.putBlob(&opts)
+	_, err = sr.S3Wrapper.putBlob(&opts)
 	if err != nil {
 		return err
 	}
