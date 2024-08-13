@@ -12,7 +12,7 @@ all: $(TARGETS)
 
 .PHONY: test
 test:
-	go test -v -cover ./...
+	go test -short -v -cover ./...
 
 .PHONY: clean
 clean:

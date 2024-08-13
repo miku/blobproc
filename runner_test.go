@@ -98,7 +98,6 @@ func TestBlobprocRoundtrip(t *testing.T) {
 	}
 	grobid := grobidclient.New(grobidHostport)
 	runner := &Runner{
-		SpoolDir:          dir,
 		Grobid:            grobid,
 		MaxGrobidFileSize: 256 * 1024 * 1024,
 		ConsolidateMode:   false,

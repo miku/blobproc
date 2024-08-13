@@ -15,7 +15,7 @@ var (
 
 var DefaultBucket = "default" // TODO: what is it?
 
-// Runner run derivations of a file and also stores the results in S3.
+// Runner wraps all custom processing from a file path on disk to the S3 storage.
 type Runner struct {
 	Grobid            *grobidclient.Grobid // Grobid client wraps grobid service API access.
 	MaxGrobidFileSize int64                // Do not send too large blobs to grobid.
