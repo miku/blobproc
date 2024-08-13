@@ -4,7 +4,7 @@ status: testing
 
 BLOBPROC contains two components:
 
-* **blobprocd** exposes an HTTP server that can receive binary data (here: PDF) and stores it into a spool folder
+* **blobprocd** exposes an HTTP server that can receive binary data and stores it in a [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
 * **blobproc** is a process that scans the spool folder and executes post processing tasks on each PDF, and removes the file from spool, if all processing succeeded
 
 In our case blobproc will execute the following tasks:
