@@ -38,6 +38,18 @@ More tasks can be added by extending blobproc itself. Our focus is on simple dep
 * [ ] log performance measures
 * [ ] grafana
 
+## Notes
+
+This tool should cover most of the following areas from sandcrawler:
+
+* `run_grobid_extract`
+* `run_pdf_extract`
+* `run_persist_grobid`
+* `run_persist_pdftext`
+* `run_persist_thumbnail`
+
+Including references workers.
+
 ----
 
 Image credit: [SD](https://github.com/CompVis/stable-diffusion)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/miku/grobidclient"
 )
@@ -104,6 +105,20 @@ func (sr *Runner) RunGrobid(filename string) (string, error) {
 	return result.SHA1, err
 }
 
-func (sr *Runner) RunPdfToText(filename string) error { return nil }
+func (sr *Runner) RunPdfToText(filename string) error {
+	path, err := exec.LookPath("pdftotext")
+	if err != nil {
+		return err
+	}
+	f, err := os.CreateTemp("", "blobproc-run-*")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		f.Close()
+		os.Remove(f.Name())
+	}()
+	cmd := exec.Command("pdftotext", filename, f.Name())
+}
 
 func (sr *Runner) RunPdfThumbnail(filename string) error { return nil }

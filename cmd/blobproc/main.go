@@ -84,7 +84,8 @@ func main() {
 		}
 		slog.Info("processing", "path", path)
 		if _, err := runner.RunGrobid(path); err != nil {
-			slog.Error("grobid failed", "err", err)
+			slog.Error("grobid failed", "err", err, "path", path)
+			return err
 		}
 		return nil
 	})
