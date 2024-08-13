@@ -3,6 +3,7 @@ package blobproc
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 
@@ -106,7 +107,7 @@ func (sr *Runner) RunGrobid(filename string) (string, error) {
 }
 
 func (sr *Runner) RunPdfToText(filename string) error {
-	path, err := exec.LookPath("pdftotext")
+	_, err := exec.LookPath("pdftotext")
 	if err != nil {
 		return err
 	}
@@ -118,7 +119,15 @@ func (sr *Runner) RunPdfToText(filename string) error {
 		f.Close()
 		os.Remove(f.Name())
 	}()
+	// TODO: run w/ and w/o -layout and drop the shorter or empty one
 	cmd := exec.Command("pdftotext", filename, f.Name())
+	err = cmd.Run()
+	if err != nil {
+		return err
+	}
+	slog.Info("extracted fulltext: %v", f.Name())
+	// sandcrawler uses python poppler, but pdftotext uses it too
+	return nil
 }
 
 func (sr *Runner) RunPdfThumbnail(filename string) error { return nil }
