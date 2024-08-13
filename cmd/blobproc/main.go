@@ -87,6 +87,10 @@ func main() {
 			slog.Error("grobid failed", "err", err, "path", path)
 			return err
 		}
+		if err := runner.RunPdfToText(path); err != nil {
+			slog.Error("pdftotext failed", "err", err, "path", path)
+			return err
+		}
 		return nil
 	})
 	if err != nil {

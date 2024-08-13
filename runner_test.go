@@ -118,6 +118,9 @@ func TestBlobprocRoundtrip(t *testing.T) {
 		t.Fatalf("could not retrieve result: %v", err)
 	}
 	t.Logf("parse result: %v", string(b))
+	if err := runner.RunPdfToText(dst); err != nil {
+		t.Fatalf("failed to extract text: %v", err)
+	}
 	t.Logf("roundtrip completed")
 }
 

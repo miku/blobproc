@@ -125,7 +125,11 @@ func (sr *Runner) RunPdfToText(filename string) error {
 	if err != nil {
 		return err
 	}
-	slog.Info("extracted fulltext: %v", f.Name())
+	b, err := os.ReadFile(f.Name())
+	if err != nil {
+		return err
+	}
+	slog.Info("extracted fulltext", "path", f.Name(), "text", string(b))
 	// sandcrawler uses python poppler, but pdftotext uses it too
 	return nil
 }
