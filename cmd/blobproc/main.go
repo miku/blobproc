@@ -15,22 +15,24 @@ import (
 )
 
 var (
-	spoolDir          = flag.String("spool", path.Join(xdg.DataHome, "/webspool/spool"), "")
-	pidFile           = flag.String("pidfile", path.Join(xdg.RuntimeDir, "webspool.pid"), "pidfile")
+	spoolDir = flag.String("spool", path.Join(xdg.DataHome, "/webspool/spool"), "")
+	pidFile  = flag.String("pidfile", path.Join(xdg.RuntimeDir, "webspool.pid"), "pidfile")
+	logFile  = flag.String("log", "", "structured log output file, stderr if empty")
+	debug    = flag.Bool("debug", false, "more verbose output")
+	// GROBID related
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq")
 	consolidateMode   = flag.Bool("consolidate-mode", false, "consolidate mode")
 	maxGrobidFilesize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
-	s3                = flag.String("s3", "", "S3 endpoint") // TODO: access key in env
-	s3AccessKey       = flag.String("s3-access-key", "minioadmin", "S3 access key")
-	s3SecretKey       = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
-	logFile           = flag.String("log", "", "structured log output file, stderr if empty")
-	debug             = flag.Bool("debug", false, "more verbose output")
+	// S3 related
+	s3          = flag.String("s3", "", "S3 endpoint") // TODO: access key in env
+	s3AccessKey = flag.String("s3-access-key", "minioadmin", "S3 access key")
+	s3SecretKey = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
 )
 
 func main() {
 	flag.Parse()
 	if err := pidfile.Write(*pidFile, os.Getpid()); err != nil {
-		slog.Error("exiting", "err", err)
+		slog.Error("exiting", "err", err, "pidfile", "*pidFile")
 		os.Exit(1)
 	}
 	var (
