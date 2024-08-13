@@ -59,9 +59,9 @@ func (runner *Runner) processFulltext(filename string) (*ProcessFulltextResult, 
 	if err != nil {
 		return &ProcessFulltextResult{
 			Status:     "grobid-error",
-			StatusCode: result.StatusCode,
+			StatusCode: -1,
 			Error:      err,
-			SHA1:       result.SHA1,
+			SHA1:       "",
 		}, err
 	}
 	switch {
@@ -89,24 +89,22 @@ func (runner *Runner) processFulltext(filename string) (*ProcessFulltextResult, 
 	}
 }
 
-func (sr *Runner) RunGrobid(filename string) error {
-	_, err := sr.processFulltext(filename)
+// RunGrobid and persist, returns the sha1 of the filename and any error.
+func (sr *Runner) RunGrobid(filename string) (string, error) {
+	result, err := sr.processFulltext(filename)
 	if err != nil {
-		return err
+		return "", err
 	}
 	opts := BlobRequestOptions{
-		SHA1Hex: "", // TODO: SHA1 of the PDF
+		SHA1Hex: result.SHA1,
 		Folder:  "grobid",
 		Ext:     ".tei.xml",
 		Bucket:  "sandcrawler",
 	}
-	sr.S3Wrapper.putBlob(&opts)
 	_, err = sr.S3Wrapper.putBlob(&opts)
-	if err != nil {
-		return err
-	}
-	return nil
+	return result.SHA1, err
 }
+
 func (sr *Runner) RunPdfToText(filename string) error { return nil }
 
 func (sr *Runner) RunPdfThumbnail(filename string) error { return nil }
