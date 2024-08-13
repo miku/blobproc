@@ -70,7 +70,6 @@ func main() {
 	}
 	slog.Info("initialized s3 wrapper", "host", *s3)
 	runner := &blobproc.Runner{
-		SpoolDir:          *spoolDir,
 		Grobid:            grobid,
 		MaxGrobidFileSize: *maxGrobidFilesize,
 		ConsolidateMode:   *consolidateMode,

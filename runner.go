@@ -17,7 +17,6 @@ var DefaultBucket = "default" // TODO: what is it?
 
 // Runner run derivations of a file and also stores the results in S3.
 type Runner struct {
-	SpoolDir          string               // SpoolDir is a directory where we expect PDF files.
 	Grobid            *grobidclient.Grobid // Grobid client wraps grobid service API access.
 	MaxGrobidFileSize int64                // Do not send too large blobs to grobid.
 	ConsolidateMode   bool                 // ConsolidateMode pass through argument to grobid.
