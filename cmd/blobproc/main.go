@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"io/fs"
-	"log"
 	"log/slog"
 	"os"
 	"path"
@@ -24,6 +23,8 @@ var (
 	s3                = flag.String("s3", "", "S3 endpoint") // TODO: access key in env
 	s3AccessKey       = flag.String("s3-access-key", "minioadmin", "S3 access key")
 	s3SecretKey       = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
+	logFile           = flag.String("log", "", "structured log output file, stderr if empty")
+	debug             = flag.Bool("debug", false, "more verbose output")
 )
 
 func main() {
@@ -32,7 +33,29 @@ func main() {
 		slog.Error("exiting", "err", err)
 		os.Exit(1)
 	}
+	var (
+		logLevel = slog.LevelInfo
+		h        slog.Handler
+	)
+	if *debug {
+		logLevel = slog.LevelDebug
+	}
+	switch {
+	case *logFile != "":
+		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			slog.Error("cannot open log", "err", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		h = slog.NewJSONHandler(f, &slog.HandlerOptions{Level: logLevel})
+	default:
+		h = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+	}
+	logger := slog.New(h)
+	slog.SetDefault(logger)
 	grobid := grobidclient.New(*grobidHost)
+	slog.Info("initialize grobid client", "host", *grobidHost)
 	s3wrapper, err := blobproc.NewWrapS3(*s3, &blobproc.WrapS3Options{
 		AccessKey:     *s3AccessKey,
 		SecretKey:     *s3SecretKey,
@@ -40,8 +63,10 @@ func main() {
 		UseSSL:        false,
 	})
 	if err != nil {
-		log.Fatalf("cannot access S3: %v", err)
+		slog.Error("cannot access S3", "err", err)
+		os.Exit(1)
 	}
+	slog.Info("initialized s3 wrapper", "host", *s3)
 	runner := &blobproc.Runner{
 		SpoolDir:          *spoolDir,
 		Grobid:            grobid,
@@ -63,6 +88,7 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("walk failed", "err", err)
+		os.Exit(1)
 	}
 }
