@@ -14,6 +14,11 @@ all: $(TARGETS)
 test:
 	go test -short -v -cover ./...
 
+.PHONY: cover
+cover:
+	# may take 1m46.456s or more
+	go test -v -cover ./...
+
 .PHONY: clean
 clean:
 	rm -f $(TARGETS)
