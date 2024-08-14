@@ -37,6 +37,8 @@ func TestGenerateFileInfo(t *testing.T) {
 	}
 	for _, c := range cases {
 		fi := GenerateFileInfo(c.data)
+		var fi FileInfo
+		fi.FromBytes(c.data)
 		if !reflect.DeepEqual(fi, c.result) {
 			t.Fatalf("got %v, want %v", fi, c.result)
 		}

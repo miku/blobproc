@@ -4,9 +4,11 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
-	"fmt"
 	"hash"
+	"io"
+	"os"
 
 	"github.com/gabriel-vasile/mimetype"
 )
@@ -22,16 +24,37 @@ type FileInfo struct {
 	Mimetype  string
 }
 
-func GenerateFileInfo(p []byte) FileInfo {
+// FromBytes creates a FileInfo object from bytes.
+func (fi *FileInfo) FromBytes(p []byte) {
 	var hasher = []hash.Hash{md5.New(), sha1.New(), sha256.New()}
 	for _, h := range hasher {
 		_, _ = h.Write(p)
 	}
-	return FileInfo{
+	fi = &FileInfo{
 		Size:      int64(len(p)),
-		MD5Hex:    fmt.Sprintf("%x", hasher[0].Sum(nil)),
-		SHA1Hex:   fmt.Sprintf("%x", hasher[1].Sum(nil)),
-		SHA256Hex: fmt.Sprintf("%x", hasher[2].Sum(nil)),
+		MD5Hex:    hex.EncodeToString(hasher[0].Sum(nil)),
+		SHA1Hex:   hex.EncodeToString(hasher[1].Sum(nil)),
+		SHA256Hex: hex.EncodeToString(hasher[2].Sum(nil)),
 		Mimetype:  mimetype.Detect(p).String(),
 	}
+}
+
+// FromReader creates file info fields from metadata.
+func (fi *FileInfo) FromReader(r io.Reader) error {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	fi.FromBytes(b)
+	return nil
+}
+
+// FromFile creates a FileInfo object from a path.
+func (fi *FileInfo) FromFile(filename string) error {
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return fi.FromReader(f)
 }
