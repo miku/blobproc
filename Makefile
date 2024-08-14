@@ -7,8 +7,7 @@ MAKEFLAGS := --jobs=$(shell nproc)
 all: $(TARGETS)
 
 %: cmd/%/main.go
-	# GLIBC version mismatch on deployment target, use CGO_ENABLED=0
-	CGO_ENABLED=0 go build -o $@ $<
+	CGO_ENABLED=0 go build -o $@ $< # GLIBC version mismatch on deployment target, use CGO_ENABLED=0
 
 .PHONY: test
 test:
