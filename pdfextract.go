@@ -24,7 +24,7 @@ type PDFExtractResult struct {
 	MetaXML           string
 	PDFInfo           json.RawMessage // pdfcpu output, JSON
 	PDFExtra          *PDFExtra
-	Source            any // Dict[str, any]
+	Source            json.RawMessage // Dict[str, any]
 }
 
 // PDFExtra was a free form dictionary in the sandcrawler.
@@ -99,7 +99,7 @@ func extractThumbnailFromPDF(blob []byte, dim Dim) ([]byte, error) {
 		"-f", "1",
 		"-l", "1",
 		"-singlefile",
-		"-scale-tox", fmt.Sprintf("%d", dim.W),
+		"-scale-to-x", fmt.Sprintf("%d", dim.W),
 		"-scale-to-y", fmt.Sprintf("%d", dim.H),
 		f.Name(),
 		dst)
