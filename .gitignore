@@ -25,3 +25,5 @@ go.work.sum
 /blobproc
 packaging/deb/blobproc/usr/*
 *.deb
+
+.venv

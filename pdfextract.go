@@ -1,28 +1,141 @@
 package blobproc
 
 import (
-	"log"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
 	"slices"
 )
 
-// PDFExtractResult is the result of a text and thumbnail extraction from a PDF.
+// PDFExtractResult is the result of a text and thumbnail extraction from a
+// PDF. Both are combined since previous implementation used the poppler
+// library in one go for performance.
 type PDFExtractResult struct {
 	SHA1Hex           string
 	Status            string
 	Err               error
-	FileInfo          FileInfo
+	FileInfo          *FileInfo
 	Text              string
 	Page0Thumbnail    []byte
 	HasPage0Thumbnail bool
 	MetaXML           string
-	PDFInfo           any
-	PDFExtra          any
-	Source            any
+	PDFInfo           json.RawMessage // pdfcpu output, JSON
+	PDFExtra          *PDFExtra
+	Source            any // Dict[str, any]
+}
+
+// PDFExtra was a free form dictionary in the sandcrawler.
+//
+// In [8]: page_1.page_rect().width
+// Out[8]: 595.2760000000001
+//
+// In [9]: page_1.page_rect().height
+// Out[9]: 841.89
+//
+// In [10]: pdf_document.pdf_id
+// Out[10]: PDFId(permanent_id='070262676b9d8a3776b3a9e2c168f961', update_id='29245f594c8bea0fc7f2cc90ca1dd021')
+type PDFExtra struct {
+	Page0Height int // in pts, we can parse "pdfinfo" output
+	Page0Witdth int // in pts, we can parse "pdfinfo" output
+	PageCount   int // "pdfinfo" "Pages"
+	PermanentID string
+	UpdateID    string
+	PDFVersion  string // PDF version: 1.5, ...
 }
 
 type Dim struct {
 	W int
 	H int
+}
+
+// extractTextFromPDF returns the text of the PDF, uses pdftotext.
+func extractTextFromPDF(blob []byte) (string, error) {
+	f, err := os.CreateTemp("", "blobproc-pdf-*")
+	if err != nil {
+		return "", err
+	}
+	dst := f.Name() + ".txt"
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(f.Name()) // pdf
+		_ = os.Remove(dst)      // txt
+	}()
+	_, err = io.Copy(f, bytes.NewReader(blob))
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.Command("pdftotext", f.Name(), dst)
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	b, err := os.ReadFile(dst)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// extractThumbnailFromPDF runs pdftoppm to render page0 of the PDF into an image.
+func extractThumbnailFromPDF(blob []byte, dim Dim) ([]byte, error) {
+	f, err := os.CreateTemp("", "blobproc-pdf-*")
+	if err != nil {
+		return nil, err
+	}
+	dst := f.Name() + ".page0.jpg"
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(f.Name()) // pdf
+		_ = os.Remove(dst)      // jpg
+	}()
+	_, err = io.Copy(f, bytes.NewReader(blob))
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("pdftoppm",
+		"-jpeg",
+		"-f", "1",
+		"-l", "1",
+		"-singlefile",
+		"-scale-tox", fmt.Sprintf("%d", dim.W),
+		"-scale-to-y", fmt.Sprintf("%d", dim.H),
+		f.Name(),
+		dst)
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(dst)
+}
+
+// extractPDFInfo extracts the PDF info via pdfcpu as raw JSON bytes.
+func extractPDFInfo(blob []byte) ([]byte, error) {
+	f, err := os.CreateTemp("", "blobproc-pdf-*")
+	if err != nil {
+		return nil, err
+	}
+	dst := f.Name() + ".pdfinfo.json"
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(f.Name()) // pdf
+		_ = os.Remove(dst)      // jpg
+	}()
+	_, err = io.Copy(f, bytes.NewReader(blob))
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	cmd := exec.Command("pdfcpu",
+		"info",
+		"-j",
+		f.Name())
+	cmd.Stdout = &buf
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+
 }
 
 // ProcessPDF takes a blob and returns a pdf extract result.
@@ -31,12 +144,70 @@ func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 	fi.FromBytes(blob)
 	switch {
 	case fi.Mimetype != "application/pdf":
-		log.Println("no pdf")
+		return &PDFExtractResult{
+			SHA1Hex:  fi.SHA1Hex,
+			Status:   "not-pdf",
+			Err:      fmt.Errorf("mimetype is %v", fi.Mimetype),
+			FileInfo: fi,
+		}
 	case slices.Contains(BAD_PDF_SHA1HEX, fi.SHA1Hex):
-		log.Println("bad hex")
+		return &PDFExtractResult{
+			SHA1Hex:  fi.SHA1Hex,
+			Status:   "bad-pdf",
+			Err:      fmt.Errorf("PDF known to cause processing issues"),
+			FileInfo: fi,
+		}
 	}
+	text, err := extractTextFromPDF(blob)
+	if err != nil {
+		return &PDFExtractResult{
+			SHA1Hex:           fi.SHA1Hex,
+			Status:            "parse-error",
+			Err:               fmt.Errorf("text extraction failed: %w", err),
+			HasPage0Thumbnail: false,
+		}
+	}
+	if len(text) == 0 {
+		return &PDFExtractResult{
+			SHA1Hex: fi.SHA1Hex,
+			Status:  "empty-pdf",
+			Err:     fmt.Errorf("zero length text"),
+		}
+	}
+	page0Thumbail, err := extractThumbnailFromPDF(blob, dim)
+	if err != nil {
+		return &PDFExtractResult{
+			SHA1Hex: fi.SHA1Hex,
+			Status:  "parse-error",
+			Err:     fmt.Errorf("thumbnail failed with: %w", err),
+		}
+	}
+	if len(page0Thumbail) < 50 {
+		// assuming that very small images mean something went wrong
+		page0Thumbail = nil
+	}
+	pdfInfo, err := extractPDFInfo(blob)
+	if err != nil {
+		return &PDFExtractResult{
+			SHA1Hex: fi.SHA1Hex,
+			Status:  "parse-error",
+			Err:     fmt.Errorf("pdf info extraction failed with: %w", err),
+		}
+	}
+	// TODO: pdfextra
+	return &PDFExtractResult{
+		SHA1Hex:        fi.SHA1Hex,
+		Status:         "success",
+		Err:            nil,
+		FileInfo:       fi,
+		Text:           text,
+		Page0Thumbnail: page0Thumbail,
+		PDFInfo:        json.RawMessage(pdfInfo),
+	}
+
 	// TODO: pdftoppm for thumbnail
 	// TODO: pdftotext for text
+	return nil
 }
 
 // This is a hack to work around timeouts when processing certain PDFs with
