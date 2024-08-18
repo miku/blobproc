@@ -18,6 +18,7 @@ type WrapS3 struct {
 }
 
 // WrapS3Options mostly contains pass through options for minio client.
+// Keys from environment, e.g. ...BLOB_ACCESS_KEY
 type WrapS3Options struct {
 	AccessKey     string
 	SecretKey     string
@@ -43,6 +44,19 @@ func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 
 // BlobRequestOptions wraps the blob request options, both for setting and
 // retrieving a blob.
+//
+// Currently used folder names:
+//
+// - "pdf" for thumbnails
+// - "xml_doc" for TEI-XML
+// - "html_body" for HTML TEI-XML
+// - "unknown" for generic
+//
+// Default bucket is "sandcrawler-dev", other buckets via infra:
+//
+// - "sandcrawler" for sandcrawler_grobid_bucket
+// - "thumbnail" for sandcrawler_thumbnail_bucket
+// - "sandcrawler" for sandcrawler_text_bucket
 type BlobRequestOptions struct {
 	Folder  string
 	Blob    []byte
@@ -68,7 +82,7 @@ func blobPath(folder, sha1hex, ext, prefix string) string {
 		prefix, folder, sha1hex[0:2], sha1hex[2:4], sha1hex, ext)
 }
 
-// putBlob takes a data to be put into S3 and saves it.
+// PutBlob takes a data to be put into S3 and saves it.
 func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutBlobResponse, error) {
 	if req.SHA1Hex == "" {
 		h := sha1.New()
@@ -128,7 +142,7 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 	}, nil
 }
 
-// getBlob returns the object bytes given a blob request.
+// GetBlob returns the object bytes given a blob request.
 func (wrap *WrapS3) GetBlob(ctx context.Context, req *BlobRequestOptions) ([]byte, error) {
 	objPath := blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)
 	if req.Bucket == "" {
