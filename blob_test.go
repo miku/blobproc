@@ -120,36 +120,72 @@ func TestPutGetObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("got %v, want nil", err)
 	}
-	opts := &BlobRequestOptions{
-		Folder:  "f",
-		SHA1Hex: "", // should be calculated if not given
-		Blob:    []byte("hello, world!"),
-		Prefix:  "",
-		Ext:     "",
+	var cases = []struct {
+		opts         *BlobRequestOptions
+		expectedPath string
+	}{
+		{
+			opts: &BlobRequestOptions{
+				Folder:  "f",
+				SHA1Hex: "", // should be calculated if not given
+				Blob:    []byte("hello, world!"),
+				Prefix:  "",
+				Ext:     "",
+			},
+			expectedPath: "f/1f/09/1f09d30c707d53f3d16c530dd73d70a6ce7596a9",
+		},
+		{
+			opts: &BlobRequestOptions{
+				Folder:  "",
+				SHA1Hex: "", // should be calculated if not given
+				Blob:    []byte("123"),
+				Prefix:  "",
+				Ext:     "",
+			},
+			expectedPath: "/40/bd/40bd001563085fc35165329ea1ff5c5ecbdbbeef",
+		},
+		{
+			opts: &BlobRequestOptions{
+				Folder:  "",
+				SHA1Hex: "", // should be calculated if not given
+				Blob:    []byte("123"),
+				Prefix:  "",
+				Ext:     "tei.xml",
+			},
+			// TODO: minio will strip any leading slash?
+			expectedPath: "/40/bd/40bd001563085fc35165329ea1ff5c5ecbdbbeef.tei.xml",
+		},
+		{
+			opts: &BlobRequestOptions{
+				Folder:  "thumbnails",
+				SHA1Hex: "", // should be calculated if not given
+				Blob:    []byte("123"),
+				Prefix:  "dev-",
+				Ext:     "png",
+			},
+			expectedPath: "dev-thumbnails/40/bd/40bd001563085fc35165329ea1ff5c5ecbdbbeef.png",
+		},
 	}
-	resp, err := wrap.PutBlob(context.TODO(), opts)
-	if err != nil {
-		t.Fatalf("PutBlob failed: %v", err)
+	for _, c := range cases {
+		resp, err := wrap.PutBlob(context.TODO(), c.opts)
+		if err != nil {
+			t.Fatalf("PutBlob failed: %v", err)
+		}
+		if want := c.expectedPath; resp.ObjectPath != want {
+			t.Fatalf("[put] got %v, want %v", resp.ObjectPath, want)
+		} else {
+			t.Logf("successfully saved blob: %v", resp.ObjectPath)
+		}
+		// c.opts will have the SHA1 field amended, hacky, because invisible
+		b, err := wrap.GetBlob(context.TODO(), c.opts)
+		if err != nil {
+			t.Fatalf("GetBlob failed: %v", err)
+		}
+		if want := string(c.opts.Blob); string(b) != want {
+			t.Fatalf("[get] got %v, want %v", string(b), want)
+		}
+		t.Logf("successfully retrieved blob: %v", resp.ObjectPath)
 	}
-	if want := "f/1f/09/1f09d30c707d53f3d16c530dd73d70a6ce7596a9"; resp.ObjectPath != want {
-		t.Fatalf("[put] got %v, want %v", resp.ObjectPath, want)
-	} else {
-		t.Logf("successfully saved blob: %v", resp.ObjectPath)
-	}
-	opts = &BlobRequestOptions{
-		Folder:  "f",
-		SHA1Hex: "1f09d30c707d53f3d16c530dd73d70a6ce7596a9",
-		Prefix:  "",
-		Ext:     "",
-	}
-	b, err := wrap.GetBlob(context.TODO(), opts)
-	if err != nil {
-		t.Fatalf("GetBlob failed: %v", err)
-	}
-	if want := "hello, world!"; string(b) != want {
-		t.Fatalf("[get] got %v, want %v", string(b), want)
-	}
-	t.Logf("successfully retrieved blob: %v", resp.ObjectPath)
 }
 
 func skipNoDocker(t *testing.T) {
