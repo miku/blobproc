@@ -1,6 +1,7 @@
 package blobproc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -102,7 +103,7 @@ func (sr *Runner) RunGrobid(filename string) (string, error) {
 		Ext:     ".tei.xml",
 		Bucket:  "sandcrawler",
 	}
-	_, err = sr.S3Wrapper.putBlob(&opts)
+	_, err = sr.S3Wrapper.PutBlob(context.TODO(), &opts)
 	return result.SHA1, err
 }
 

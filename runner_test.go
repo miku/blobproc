@@ -107,7 +107,7 @@ func TestBlobprocRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run grobid: got %v, want nil", err)
 	}
-	b, err := s3wrapper.getBlob(&BlobRequestOptions{
+	b, err := s3wrapper.GetBlob(context.TODO(), &BlobRequestOptions{
 		Folder:  "grobid",
 		SHA1Hex: sha1hex,
 		Ext:     ".tei.xml",

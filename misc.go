@@ -30,7 +30,7 @@ func (fi *FileInfo) FromBytes(p []byte) {
 	for _, h := range hasher {
 		_, _ = h.Write(p)
 	}
-	fi = &FileInfo{
+	*fi = FileInfo{
 		Size:      int64(len(p)),
 		MD5Hex:    hex.EncodeToString(hasher[0].Sum(nil)),
 		SHA1Hex:   hex.EncodeToString(hasher[1].Sum(nil)),

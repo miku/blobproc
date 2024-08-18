@@ -27,7 +27,7 @@ func TestGenerateFileInfo(t *testing.T) {
 		{
 			data: testdataPdf1,
 			result: FileInfo{
-				Size:      0,
+				Size:      633850,
 				MD5Hex:    "e04a100bc6a02efbf791566d6cb62bc9",
 				SHA1Hex:   "4e6ca8dfc787a8b33e92773df3674fadf4d4cdb6",
 				SHA256Hex: "31d0504caf44007be46d5aa64640dc2c1054aa7f4f404851f3a40c06d4ed7008",
@@ -36,7 +36,6 @@ func TestGenerateFileInfo(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		fi := GenerateFileInfo(c.data)
 		var fi FileInfo
 		fi.FromBytes(c.data)
 		if !reflect.DeepEqual(fi, c.result) {

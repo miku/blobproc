@@ -127,9 +127,9 @@ func TestPutGetObject(t *testing.T) {
 		Prefix:  "",
 		Ext:     "",
 	}
-	resp, err := wrap.putBlob(opts)
+	resp, err := wrap.PutBlob(context.TODO(), opts)
 	if err != nil {
-		t.Fatalf("putBlob failed: %v", err)
+		t.Fatalf("PutBlob failed: %v", err)
 	}
 	if want := "f/1f/09/1f09d30c707d53f3d16c530dd73d70a6ce7596a9"; resp.ObjectPath != want {
 		t.Fatalf("[put] got %v, want %v", resp.ObjectPath, want)
@@ -142,9 +142,9 @@ func TestPutGetObject(t *testing.T) {
 		Prefix:  "",
 		Ext:     "",
 	}
-	b, err := wrap.getBlob(opts)
+	b, err := wrap.GetBlob(context.TODO(), opts)
 	if err != nil {
-		t.Fatalf("getBlob failed: %v", err)
+		t.Fatalf("GetBlob failed: %v", err)
 	}
 	if want := "hello, world!"; string(b) != want {
 		t.Fatalf("[get] got %v, want %v", string(b), want)
