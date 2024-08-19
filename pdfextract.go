@@ -27,7 +27,7 @@ type PDFExtractResult struct {
 	Source            json.RawMessage // Dict[str, any]
 }
 
-// PDFExtra was a free form dictionary in the sandcrawler.
+// PDFExtra was a free form dictionary in sandcrawler.
 //
 // In [8]: page_1.page_rect().width
 // Out[8]: 595.2760000000001

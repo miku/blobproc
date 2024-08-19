@@ -18,7 +18,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const tempFilePattern = "webspoold-*"
+const tempFilePattern = "blobprocd-*"
 
 var errShortName = errors.New("short name")
 
