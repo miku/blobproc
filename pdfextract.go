@@ -53,9 +53,15 @@ func extractTextFromPDF(filename string) ([]byte, error) {
 
 // extractThumbnailFromPDF runs pdftoppm to render page0 of the PDF into an image.
 func extractThumbnailFromPDF(filename string, dim Dim) ([]byte, error) {
-	dst := filename + ".page0.wip"
+	if dim.W < 0 && dim.H < 0 {
+		return nil, nil
+	}
+	var (
+		prefix = filename + ".page0.wip"
+		dst    = prefix + ".jpg" // automatically assigned by pdftoppm
+	)
 	defer func() {
-		_ = os.Remove(dst + ".jpg")
+		_ = os.Remove(dst)
 	}()
 	cmd := exec.Command("pdftoppm",
 		"-jpeg",
@@ -65,15 +71,11 @@ func extractThumbnailFromPDF(filename string, dim Dim) ([]byte, error) {
 		"-scale-to-x", fmt.Sprintf("%d", dim.W),
 		"-scale-to-y", fmt.Sprintf("%d", dim.H),
 		filename,
-		dst)
+		prefix)
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
-	b, err := os.ReadFile(dst + ".jpg") // TODO: fix filename
-	if err != nil {
-		return nil, err
-	}
-	return b, nil
+	return os.ReadFile(dst)
 }
 
 // extractPDFMetadata extracts the PDF info via pdfcpu as raw JSON bytes.
