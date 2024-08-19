@@ -20,10 +20,13 @@ func TestPdfExtract(t *testing.T) {
 		t.Fatalf("snapshot broken: %v", err)
 	}
 	// PDFCPU fields that change on every run.
-	result.Metadata.PDFCPU.Header.Creation = ""
-	result.Metadata.PDFCPU.Infos[0].Source = ""
-	want.Metadata.PDFCPU.Header.Creation = ""
-	want.Metadata.PDFCPU.Infos[0].Source = ""
+	for _, v := range []*PDFExtractResult{
+		result,
+		&want,
+	} {
+		v.Metadata.PDFCPU.Header.Creation = ""
+		v.Metadata.PDFCPU.Infos[0].Source = ""
+	}
 	// Compare fixed fields now.
 	if !cmp.Equal(result, &want) {
 		t.Fatalf("diff: %v", cmp.Diff(result, &want))

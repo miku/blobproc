@@ -13,6 +13,10 @@ all: $(TARGETS)
 test:
 	go test -short -v -cover ./...
 
+.PHONY: bench
+bench:
+	go test -short -bench=.
+
 .PHONY: cover
 cover:
 	# may take 1m46.456s or more

@@ -102,7 +102,8 @@ func ProcessPDFFile(filename string, dim Dim, thumbType string) *PDFExtractResul
 	return ProcessPDF(b, dim, thumbType)
 }
 
-// ProcessPDF takes a blob and returns a pdf extract result.
+// ProcessPDF takes a blob and returns a pdf extract result. TODO: we can makes
+// this faster by running various subprocesses in parallel.
 func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 	var fi = new(FileInfo)
 	fi.FromBytes(blob)
