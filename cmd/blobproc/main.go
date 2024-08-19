@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	spoolDir = flag.String("spool", path.Join(xdg.DataHome, "/webspool/spool"), "")
+	spoolDir = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
 	pidFile  = flag.String("pidfile", path.Join(xdg.RuntimeDir, "webspool.pid"), "pidfile")
 	logFile  = flag.String("log", "", "structured log output file, stderr if empty")
 	debug    = flag.Bool("debug", false, "more verbose output")
 	// GROBID related
-	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq")
+	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
 	consolidateMode   = flag.Bool("consolidate-mode", false, "consolidate mode")
 	maxGrobidFilesize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
 	// S3 related
