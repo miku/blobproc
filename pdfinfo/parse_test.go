@@ -6,6 +6,72 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestParsePageSize(t *testing.T) {
+	var cases = []struct {
+		info *Info
+		dim  Dim
+	}{
+		{
+			info: nil,
+			dim:  Dim{},
+		},
+		{
+			info: &Info{
+				PageSize: "",
+			},
+			dim: Dim{},
+		},
+		{
+			info: &Info{
+				PageSize: "garbage",
+			},
+			dim: Dim{},
+		},
+		{
+			info: &Info{
+				PageSize: "100 garbage",
+			},
+			dim: Dim{},
+		},
+		{
+			info: &Info{
+				PageSize: "100 garbage",
+			},
+			dim: Dim{},
+		},
+		{
+			info: &Info{
+				PageSize: "100 100 ambiguous string",
+			},
+			dim: Dim{},
+		},
+		{
+			info: &Info{
+				PageSize: "612 x 792 pts (letter)",
+			},
+			dim: Dim{
+				Width:  612.0,
+				Height: 792.0,
+			},
+		},
+		{
+			info: &Info{
+				PageSize: "595.32 x 841.92 pts (A4)",
+			},
+			dim: Dim{
+				Width:  595.32,
+				Height: 841.92,
+			},
+		},
+	}
+	for _, c := range cases {
+		dim := c.info.PageDim()
+		if !cmp.Equal(dim, c.dim) {
+			t.Fatalf("got %v, want %v, diff: %v", dim, c.dim, cmp.Diff(dim, c.dim))
+		}
+	}
+}
+
 func TestParseFile(t *testing.T) {
 	var cases = []struct {
 		filename string

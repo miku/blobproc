@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -32,6 +33,38 @@ type Info struct {
 	FileSize       int    `json:"filesize"`
 	Optimized      bool   `json:"optimized"`
 	PDFVersion     string `json:"pdf_version"`
+}
+
+// Dim groups width and height of a page.
+type Dim struct {
+	Width  float64
+	Height float64
+}
+
+func (info *Info) PageDim() Dim {
+	if info == nil {
+		return Dim{}
+	}
+	// 463.059 x 668.047 pts
+	// 595 x 882 pts
+	re := regexp.MustCompile(`(?<width>[0-9.]*)[\s]*x[\s]*(?<height>[0-9.]*)`)
+	matches := re.FindStringSubmatch(info.PageSize)
+	if len(matches) < 3 {
+		return Dim{}
+	}
+	width, err := strconv.ParseFloat(matches[re.SubexpIndex("width")], 64)
+	if err != nil {
+		return Dim{}
+	}
+	height, err := strconv.ParseFloat(matches[re.SubexpIndex("height")], 64)
+	if err != nil {
+		return Dim{}
+	}
+	dim := Dim{
+		Width:  width,
+		Height: height,
+	}
+	return dim
 }
 
 // ParseFile parses a pdf file. Requires pdfinfo executable to be installed.
