@@ -42,6 +42,9 @@ type Dim struct {
 
 // extractTextFromPDF returns the text of the PDF, uses pdftotext.
 func extractTextFromPDF(filename string) ([]byte, error) {
+	if _, err := exec.LookPath("pdftotext"); err != nil {
+		return nil, fmt.Errorf("missing pdftotext executable")
+	}
 	var buf bytes.Buffer
 	cmd := exec.Command("pdftotext", filename, "-")
 	cmd.Stdout = &buf
@@ -55,6 +58,9 @@ func extractTextFromPDF(filename string) ([]byte, error) {
 func extractThumbnailFromPDF(filename string, dim Dim, thumbType string) ([]byte, error) {
 	if dim.W < 0 && dim.H < 0 {
 		return nil, nil
+	}
+	if _, err := exec.LookPath("pdftoppm"); err != nil {
+		return nil, fmt.Errorf("missing pdftoppm executable")
 	}
 	var (
 		prefix = filename + ".page0.wip"
@@ -94,6 +100,8 @@ func extractPDFMetadata(filename string) (*pdfinfo.Metadata, error) {
 	return pdfinfo.ParseFile(filename)
 }
 
+// ProcessPDFFile turns a PDF file to a structured output. TODO: group options
+// in a struct, as we may add more.
 func ProcessPDFFile(filename string, dim Dim, thumbType string) *PDFExtractResult {
 	f, err := os.Open(filename)
 	if err != nil {

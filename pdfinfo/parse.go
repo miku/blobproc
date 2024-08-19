@@ -3,6 +3,7 @@ package pdfinfo
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os/exec"
 	"regexp"
@@ -144,6 +145,12 @@ func (info *Info) PageDim() Dim {
 
 // ParseFile a filename into a structured metadata object. Requires pdfinfo and pdfcpu to be installed.
 func ParseFile(filename string) (*Metadata, error) {
+	if _, err := exec.LookPath("pdfcpu"); err != nil {
+		return nil, fmt.Errorf("missing pdfcpu executable")
+	}
+	if _, err := exec.LookPath("pdfinfo"); err != nil {
+		return nil, fmt.Errorf("missing pdfinfo executable")
+	}
 	var metadata = new(Metadata)
 	info, err := runPdfInfo(filename)
 	if err != nil {
