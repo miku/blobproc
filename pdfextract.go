@@ -52,7 +52,7 @@ func extractTextFromPDF(filename string) ([]byte, error) {
 }
 
 // extractThumbnailFromPDF runs pdftoppm to render page0 of the PDF into an image.
-func extractThumbnailFromPDF(filename string, dim Dim) ([]byte, error) {
+func extractThumbnailFromPDF(filename string, dim Dim, thumbType string) ([]byte, error) {
 	if dim.W < 0 && dim.H < 0 {
 		return nil, nil
 	}
@@ -63,8 +63,19 @@ func extractThumbnailFromPDF(filename string, dim Dim) ([]byte, error) {
 	defer func() {
 		_ = os.Remove(dst)
 	}()
+	var formatFlag string
+	switch thumbType {
+	case "jpg", "jpeg", "JPEG":
+		formatFlag = "-jpeg"
+	case "png", "PNG":
+		formatFlag = "-png"
+	case "tiff", "TIFF":
+		formatFlag = "-tiff"
+	default:
+		formatFlag = "-jpeg"
+	}
 	cmd := exec.Command("pdftoppm",
-		"-jpeg",
+		formatFlag,
 		"-f", "1",
 		"-l", "1",
 		"-singlefile",
@@ -80,11 +91,7 @@ func extractThumbnailFromPDF(filename string, dim Dim) ([]byte, error) {
 
 // extractPDFMetadata extracts the PDF info via pdfcpu as raw JSON bytes.
 func extractPDFMetadata(filename string) (*pdfinfo.Metadata, error) {
-	metadata, err := pdfinfo.ParseFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	return metadata, nil
+	return pdfinfo.ParseFile(filename)
 }
 
 func ProcessPDFFile(filename string, dim Dim, thumbType string) *PDFExtractResult {
@@ -165,7 +172,7 @@ func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 		}
 	}
 	// Extract the thumbnail.
-	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), dim)
+	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), dim, thumbType)
 	switch {
 	case err != nil:
 		return &PDFExtractResult{

@@ -34,7 +34,7 @@ func TestPdfExtract(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		result := ProcessPDFFile(c.filename, c.dim, "na")
+		result := ProcessPDFFile(c.filename, c.dim, "jpg")
 		if result.Status != c.status {
 			t.Fatalf("got %v, want %v", result.Status, c.status)
 		}
