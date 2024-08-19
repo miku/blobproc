@@ -53,9 +53,9 @@ func extractTextFromPDF(filename string) ([]byte, error) {
 
 // extractThumbnailFromPDF runs pdftoppm to render page0 of the PDF into an image.
 func extractThumbnailFromPDF(filename string, dim Dim) ([]byte, error) {
-	dst := filename + ".page0.jpg.wip"
+	dst := filename + ".page0.wip"
 	defer func() {
-		_ = os.Remove(dst) // jpg
+		_ = os.Remove(dst + ".jpg")
 	}()
 	cmd := exec.Command("pdftoppm",
 		"-jpeg",
@@ -69,7 +69,11 @@ func extractThumbnailFromPDF(filename string, dim Dim) ([]byte, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
-	return os.ReadFile(dst)
+	b, err := os.ReadFile(dst + ".jpg") // TODO: fix filename
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 // extractPDFMetadata extracts the PDF info via pdfcpu as raw JSON bytes.
@@ -81,12 +85,30 @@ func extractPDFMetadata(filename string) (*pdfinfo.Metadata, error) {
 	return metadata, nil
 }
 
+func ProcessPDFFile(filename string, dim Dim, thumbType string) *PDFExtractResult {
+	f, err := os.Open(filename)
+	if err != nil {
+		return &PDFExtractResult{
+			Err: err,
+		}
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return &PDFExtractResult{
+			Err: err,
+		}
+	}
+	return ProcessPDF(b, dim, thumbType)
+}
+
 // ProcessPDF takes a blob and returns a pdf extract result.
 func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 	var fi = new(FileInfo)
 	fi.FromBytes(blob)
 	// Save PDF blob to a temporary file to run various cli tools over it.
-	tf, err := os.CreateTemp("", "blobproc-pdf-*")
+	// Strangely, pdfcpu wants a file with a .pdf extension (-1).
+	tf, err := os.CreateTemp("", "blobproc-pdf-*.pdf")
 	if err != nil {
 		return &PDFExtractResult{
 			SHA1Hex:  fi.SHA1Hex,
@@ -125,14 +147,14 @@ func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 	}
 	// Extract the fulltext.
 	text, err := extractTextFromPDF(tf.Name())
-	if err != nil {
+	switch {
+	case err != nil:
 		return &PDFExtractResult{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "parse-error",
 			Err:     fmt.Errorf("text extraction failed: %w", err),
 		}
-	}
-	if len(text) == 0 {
+	case len(text) == 0:
 		return &PDFExtractResult{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "empty-pdf",
@@ -141,27 +163,27 @@ func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 	}
 	// Extract the thumbnail
 	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), dim)
-	if err != nil {
+	switch {
+	case err != nil:
 		return &PDFExtractResult{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "parse-error",
 			Err:     fmt.Errorf("thumbnail failed with: %w", err),
 		}
-	}
-	if len(page0Thumbail) < 50 {
+	case len(page0Thumbail) < 50:
 		// assuming that very small images mean something went wrong
 		page0Thumbail = nil
 	}
 	// Extract additional pdf info.
 	metadata, err := extractPDFMetadata(tf.Name())
-	if err != nil {
+	switch {
+	case err != nil:
 		return &PDFExtractResult{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "parse-error",
 			Err:     fmt.Errorf("pdf info extraction failed with: %w", err),
 		}
 	}
-	// TODO: pdfextra
 	return &PDFExtractResult{
 		SHA1Hex:        fi.SHA1Hex,
 		Status:         "success",
@@ -172,10 +194,6 @@ func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 		Metadata:       metadata,
 		PDFExtra:       metadata.LegacyPDFExtra(),
 	}
-
-	// TODO: pdftoppm for thumbnail
-	// TODO: pdftotext for text
-	return nil
 }
 
 // This is a hack to work around timeouts when processing certain PDFs with
