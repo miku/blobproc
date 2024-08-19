@@ -2,6 +2,7 @@ package pdfinfo
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"os/exec"
 	"regexp"
@@ -9,7 +10,81 @@ import (
 	"strings"
 )
 
-// Info is a parse pdfinfo output.
+// Metadata groups output of various tools into a single struct.
+type Metadata struct {
+	PDFCPU  *PDFCPU `json:"pdfcpu,omitempty"`  // pdfcpu output, parsed into JSON.
+	PDFInfo *Info   `json:"pdfinfo,omitempty"` // pdfinfo, parsed into JSON.
+}
+
+func (metadata Metadata) LegacyPDFExtra() *PDFExtra {
+	return &PDFExtra{
+		Page0Height: metadata.PDFInfo.PageDim().Height,
+		Page0Width:  metadata.PDFInfo.PageDim().Width,
+		PageCount:   metadata.PDFInfo.Pages,
+		PDFVersion:  metadata.PDFInfo.PDFVersion,
+	}
+}
+
+// PDFExtra was a free form dictionary in sandcrawler. Keep this here for
+// compatibility.
+//
+// In [10]: pdf_document.pdf_id
+// Out[10]: PDFId(permanent_id='070262676b9d8a3776b3a9e2c168f961',
+// update_id='29245f594c8bea0fc7f2cc90ca1dd021')
+type PDFExtra struct {
+	Page0Height float64 `json:"page0height,omitempty"`  // in pts, we can parse "pdfinfo" output
+	Page0Width  float64 `json:"page0width,omitempty"`   // in pts, we can parse "pdfinfo" output
+	PageCount   int     `json:"page_count,omitempty"`   // "pdfinfo" "Pages"
+	PermanentID string  `json:"permanent_id,omitempty"` // TODO: where do we get this from?
+	UpdateID    string  `json:"update_id,omitempty"`    // TODO: where do we get this from?
+	PDFVersion  string  `json:"pdf_version,omitempty"`  // PDF version: 1.5, ...
+}
+
+// PDFCPU structured output from pdfcpu tool.
+type PDFCPU struct {
+	Header struct {
+		Creation string `json:"creation"`
+		Version  string `json:"version"`
+	} `json:"header"`
+	Infos []struct {
+		AppendOnly       bool     `json:"appendOnly"`
+		Author           string   `json:"author"`
+		Bookmarks        bool     `json:"bookmarks"`
+		CreationDate     string   `json:"creationDate"`
+		Creator          string   `json:"creator"`
+		Encrypted        bool     `json:"encrypted"`
+		Form             bool     `json:"form"`
+		Hybrid           bool     `json:"hybrid"`
+		Keywords         []string `json:"keywords"`
+		Linearized       bool     `json:"linearized"`
+		ModificationDate string   `json:"modificationDate"`
+		Names            bool     `json:"names"`
+		PageCount        int64    `json:"pageCount"`
+		PageMode         string   `json:"pageMode"`
+		PageSizes        []struct {
+			Height float64 `json:"height"`
+			Width  float64 `json:"width"`
+		} `json:"pageSizes"`
+		Permissions int64  `json:"permissions"`
+		Producer    string `json:"producer"`
+		Properties  struct {
+			PTEXFullbanner string `json:"PTEX.Fullbanner"`
+		} `json:"properties"`
+		Signatures         bool   `json:"signatures"`
+		Source             string `json:"source"`
+		Subject            string `json:"subject"`
+		Tagged             bool   `json:"tagged"`
+		Thumbnails         bool   `json:"thumbnails"`
+		Title              string `json:"title"`
+		Unit               string `json:"unit"`
+		UsingObjectStreams bool   `json:"usingObjectStreams"`
+		UsingXRefStreams   bool   `json:"usingXRefStreams"`
+		Version            string `json:"version"`
+		Watermarked        bool   `json:"watermarked"`
+	} `json:"infos"`
+}
+
+// Info is a parsed pdfinfo output.
 type Info struct {
 	Title          string `json:"title"`
 	Subject        string `json:"subject"`
@@ -67,19 +142,50 @@ func (info *Info) PageDim() Dim {
 	return dim
 }
 
+// ParseFile a filename into a structured metadata object. Requires pdfinfo and pdfcpu to be installed.
+func ParseFile(filename string) (*Metadata, error) {
+	var metadata = new(Metadata)
+	info, err := runPdfInfo(filename)
+	if err != nil {
+		return nil, err
+	}
+	metadata.PDFInfo = info
+	pdfcpu, err := runPdfCpu(filename)
+	if err != nil {
+		return nil, err
+	}
+	metadata.PDFCPU = pdfcpu
+	return metadata, nil
+}
+
 // ParseFile parses a pdf file. Requires pdfinfo executable to be installed.
-func ParseFile(filename string) (*Info, error) {
+func runPdfCpu(filename string) (*PDFCPU, error) {
+	var buf bytes.Buffer
+	cmd := exec.Command("pdfcpu", "info", "-j", filename)
+	cmd.Stdout = &buf
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	var pdfcpu PDFCPU
+	if err := json.Unmarshal(buf.Bytes(), &pdfcpu); err != nil {
+		return nil, err
+	}
+	return &pdfcpu, nil
+}
+
+// runPdfInfo parses a pdf file. Requires pdfinfo executable to be installed.
+func runPdfInfo(filename string) (*Info, error) {
 	var buf bytes.Buffer
 	cmd := exec.Command("pdfinfo", filename)
 	cmd.Stdout = &buf
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
-	return Parse(buf.String()), nil
+	return ParseInfo(buf.String()), nil
 }
 
-// Parse pdfinfo output into an Info struct.
-func Parse(s string) *Info {
+// ParseInfo pdfinfo output into an Info struct.
+func ParseInfo(s string) *Info {
 	info := Info{}
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)

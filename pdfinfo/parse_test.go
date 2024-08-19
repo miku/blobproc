@@ -97,7 +97,7 @@ func TestParseFile(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		info, err := ParseFile(c.filename)
+		info, err := runPdfInfo(c.filename)
 		if err != c.err {
 			t.Fatalf("got %v, want %v", err, c.err)
 		}
@@ -198,7 +198,7 @@ func TestParse(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		info := Parse(c.s)
+		info := ParseInfo(c.s)
 		if !cmp.Equal(info, c.info) {
 			t.Fatalf("got %v, want %v, diff: %v", info, c.info, cmp.Diff(info, c.info))
 		}
