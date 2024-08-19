@@ -27,3 +27,5 @@ packaging/deb/blobproc/usr/*
 *.deb
 
 .venv
+coverage.out
+coverage.html

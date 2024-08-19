@@ -14,7 +14,8 @@ import (
 
 // PDFExtractResult is the result of a text and thumbnail extraction from a
 // PDF. Both are combined since previous implementation used the poppler
-// library in one go for performance.
+// library in one go for performance. The first processing error encountered is
+// recorded in Err.
 type PDFExtractResult struct {
 	SHA1Hex        string            `json:"sha1hex,omitempty"`        // The SHA1 of the PDF, used later as key.
 	Status         string            `json:"status,omitempty"`         // A free form status string.
@@ -28,6 +29,7 @@ type PDFExtractResult struct {
 	Source         json.RawMessage   `json:"source,omitempty"`         // Unassigned.
 }
 
+// HasPage0Thumbnail is a derived property.
 func (result *PDFExtractResult) HasPage0Thumbnail() bool {
 	return len(result.Page0Thumbnail) > 50
 }

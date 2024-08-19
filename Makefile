@@ -28,6 +28,8 @@ cover:
 clean:
 	rm -f $(TARGETS)
 	rm -f $(PKGNAME)_*.deb
+	rm -f coverage.out
+	rm -f coverage.html
 
 
 .PHONY: update-all-deps
