@@ -4,8 +4,8 @@ status: testing
 
 BLOBPROC is a *shrink wrap* version of PDF blob postprocessing found in
 sandcrawler. Specifically it is designed to process and persist documents
-without any additional component, like a database or a separate queue and do
-this in a performant, reliant and observable way.
+*without any additional component*, like a database or a separate queue and do
+this in a performant, reliant, boring and observable way.
 
 BLOBPROC contains two components:
 

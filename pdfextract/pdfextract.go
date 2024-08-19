@@ -14,9 +14,12 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"sort"
+	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/miku/blobproc/pdfinfo"
+	"mvdan.cc/xurls/v2"
 )
 
 var ErrNoData = errors.New("no data")
@@ -92,6 +95,21 @@ func (result *Result) HasPage0Thumbnail() bool {
 	return len(result.Page0Thumbnail) > 50
 }
 
+// Weblinks returns all found web urls.
+func (result *Result) Weblinks() (links []string) {
+	rx := xurls.Strict()
+	for _, u := range rx.FindAllString(result.Text, -1) {
+		u = strings.TrimSpace(u)
+		u = strings.Replace(u, "\u200b", "", -1)
+		if slices.Contains(links, u) {
+			continue
+		}
+		links = append(links, u)
+	}
+	sort.Strings(links)
+	return
+}
+
 // Dim in pixels, for thumbnail size.
 type Dim struct {
 	W int
@@ -115,6 +133,7 @@ func extractTextFromPDF(filename string) ([]byte, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
+	// Extract lightweight additional structured information from the fulltext, e.g. weblinks.
 	return buf.Bytes(), nil
 }
 

@@ -13,6 +13,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.75
 	github.com/testcontainers/testcontainers-go v0.32.0
 	golang.org/x/sys v0.24.0
+	mvdan.cc/xurls/v2 v2.5.0
 )
 
 require (
