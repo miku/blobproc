@@ -9,27 +9,63 @@ import (
 )
 
 func TestPdfExtract(t *testing.T) {
-	result := ProcessPDFFile("testdata/pdf/1906.02444.pdf", Dim{180, 300}, "na")
-	var want PDFExtractResult
-	var snapshot = "testdata/extract/1906.02444.json"
-	b, err := os.ReadFile(snapshot)
-	if err != nil {
-		t.Fatalf("cannot read snapshot: %v", snapshot)
+	var cases = []struct {
+		filename string
+		dim      Dim
+		snapshot string
+	}{
+		{
+			filename: "testdata/pdf/1906.02444.pdf",
+			dim:      Dim{180, 300},
+			snapshot: "testdata/extract/1906.02444.json",
+		},
+		{
+			filename: "testdata/pdf/1906.11632.pdf",
+			dim:      Dim{180, 300},
+			snapshot: "testdata/extract/1906.11632.json",
+		},
 	}
-	if err := json.Unmarshal(b, &want); err != nil {
-		t.Fatalf("snapshot broken: %v", err)
-	}
-	// PDFCPU fields that change on every run.
-	for _, v := range []*PDFExtractResult{
-		result,
-		&want,
-	} {
-		v.Metadata.PDFCPU.Header.Creation = ""
-		v.Metadata.PDFCPU.Infos[0].Source = ""
-	}
-	// Compare fixed fields now.
-	if !cmp.Equal(result, &want) {
-		t.Fatalf("diff: %v", cmp.Diff(result, &want))
+	for _, c := range cases {
+		result := ProcessPDFFile(c.filename, c.dim, "na")
+		var want PDFExtractResult
+		if _, err := os.Stat(c.snapshot); os.IsNotExist(err) {
+			f, err := os.CreateTemp("", "blobproc-pdf-snapshot-*.json")
+			if err != nil {
+				t.Fatalf("could not create snapshot: %v", err)
+			}
+			defer f.Close()
+			if err := json.NewEncoder(f).Encode(result); err != nil {
+				t.Fatalf("encode: %v", err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatalf("close: %v", err)
+			}
+			if err := os.Rename(f.Name(), c.snapshot); err != nil {
+				t.Fatalf("rename: %v", err)
+			}
+			t.Logf("created new snapshot: %v", c.snapshot)
+		}
+		b, err := os.ReadFile(c.snapshot)
+		if err != nil {
+			t.Fatalf("cannot read snapshot: %v", c.snapshot)
+		}
+		if err := json.Unmarshal(b, &want); err != nil {
+			t.Fatalf("snapshot broken: %v", err)
+		}
+		// PDFCPU fields that change on every run.
+		for _, v := range []*PDFExtractResult{
+			result,
+			&want,
+		} {
+			v.Metadata.PDFCPU.Header.Creation = ""
+			v.Metadata.PDFCPU.Infos[0].Source = ""
+		}
+		// Remaining fields should be fixed now.
+		if !cmp.Equal(result, &want) {
+			// If we fail, we write the result JSON to a tempfile for later
+			// inspection or snapshot creation.
+			t.Fatalf("diff: %v", cmp.Diff(result, &want))
+		}
 	}
 }
 
