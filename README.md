@@ -2,9 +2,14 @@
 
 status: testing
 
+BLOBPROC is a *shrink wrap* version of PDF blob postprocessing found in
+sandcrawler. Specifically it is designed to process and persist documents
+without any additional component, like a database or a separate queue and do
+this in a performant, reliant and observable way.
+
 BLOBPROC contains two components:
 
-* **blobprocd** exposes an HTTP server that can receive binary data and stores it in a [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
+* **blobprocd** exposes an *HTTP server* that can receive binary data and stores it in a [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
 * **blobproc** is a process that scans the spool folder and executes post processing tasks on each PDF, and removes the file from spool, if all processing succeeded
 
 In our case blobproc will execute the following tasks:
@@ -14,7 +19,8 @@ In our case blobproc will execute the following tasks:
 * generate a thumbnail from a PDF and store the result in S3
 * find all weblinks in PDF text and send them to a crawl API
 
-More tasks can be added by extending blobproc itself. Our focus is on simple deployment.
+More tasks can be added by extending blobproc itself. A focus remains on simple
+deployment via an OS distribution package.
 
 ![](static/00596.png)
 
