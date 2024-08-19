@@ -40,15 +40,13 @@ type Dim struct {
 
 // extractTextFromPDF returns the text of the PDF, uses pdftotext.
 func extractTextFromPDF(filename string) ([]byte, error) {
-	dst := filename + ".txt.wip"
-	defer func() {
-		_ = os.Remove(dst)
-	}()
-	cmd := exec.Command("pdftotext", filename, dst)
+	var buf bytes.Buffer
+	cmd := exec.Command("pdftotext", filename, "-")
+	cmd.Stdout = &buf
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
-	return os.ReadFile(dst)
+	return buf.Bytes(), nil
 }
 
 // extractThumbnailFromPDF runs pdftoppm to render page0 of the PDF into an image.
