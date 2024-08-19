@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
-	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -71,11 +70,11 @@ func (fi *FileInfo) FromFile(filename string) error {
 	return fi.FromReader(f)
 }
 
-// PDFExtractResult is the result of a text and thumbnail extraction from a
+// Result is the result of a text and thumbnail extraction from a
 // PDF. Both are combined since previous implementation used the poppler
 // library in one go for performance. The first processing error encountered is
 // recorded in Err.
-type PDFExtractResult struct {
+type Result struct {
 	SHA1Hex        string            `json:"sha1hex,omitempty"`        // The SHA1 of the PDF, used later as key.
 	Status         string            `json:"status,omitempty"`         // A free form status string.
 	Err            error             `json:"err,omitempty"`            // Any error we encountered.
@@ -89,7 +88,7 @@ type PDFExtractResult struct {
 }
 
 // HasPage0Thumbnail is a derived property.
-func (result *PDFExtractResult) HasPage0Thumbnail() bool {
+func (result *Result) HasPage0Thumbnail() bool {
 	return len(result.Page0Thumbnail) > 50
 }
 
@@ -99,8 +98,8 @@ type Dim struct {
 	H int
 }
 
-// ProcessPDFOptions controls the pdf extraction process.
-type ProcessPDFOptions struct {
+// Options controls the pdf extraction process.
+type Options struct {
 	Dim       Dim
 	ThumbType string
 }
@@ -165,35 +164,35 @@ func extractPDFMetadata(filename string) (*pdfinfo.Metadata, error) {
 	return pdfinfo.ParseFile(filename)
 }
 
-// ProcessPDFFile turns a PDF file to a structured output. TODO: group options
+// ProcessFile turns a PDF file to a structured output. TODO: group options
 // in a struct, as we may add more.
-func ProcessPDFFile(filename string, opts *ProcessPDFOptions) *PDFExtractResult {
+func ProcessFile(filename string, opts *Options) *Result {
 	f, err := os.Open(filename)
 	if err != nil {
-		return &PDFExtractResult{
+		return &Result{
 			Err: err,
 		}
 	}
 	defer f.Close()
 	b, err := io.ReadAll(f)
 	if err != nil {
-		return &PDFExtractResult{
+		return &Result{
 			Err: err,
 		}
 	}
-	return ProcessPDF(b, opts)
+	return ProcessBlob(b, opts)
 }
 
-// ProcessPDF takes a blob and returns a pdf extract result. TODO: we can makes
+// ProcessBlob takes a blob and returns a pdf extract result. TODO: we can makes
 // this faster by running various subprocesses in parallel.
-func ProcessPDF(blob []byte, opts *ProcessPDFOptions) *PDFExtractResult {
+func ProcessBlob(blob []byte, opts *Options) *Result {
 	var fi = new(FileInfo)
 	fi.FromBytes(blob)
 	// Save PDF blob to a temporary file to run various cli tools over it.
 	// Strangely, pdfcpu wants a file with a .pdf extension (-1).
 	tf, err := os.CreateTemp("", "blobproc-pdf-*.pdf")
 	if err != nil {
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex:  fi.SHA1Hex,
 			Err:      err,
 			FileInfo: fi,
@@ -205,7 +204,7 @@ func ProcessPDF(blob []byte, opts *ProcessPDFOptions) *PDFExtractResult {
 	}()
 	_, err = io.Copy(tf, bytes.NewReader(blob))
 	if err != nil {
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex:  fi.SHA1Hex,
 			Err:      err,
 			FileInfo: fi,
@@ -214,14 +213,14 @@ func ProcessPDF(blob []byte, opts *ProcessPDFOptions) *PDFExtractResult {
 	// Prefilter non-pdf and bad pdf files.
 	switch {
 	case fi.Mimetype != "application/pdf":
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex:  fi.SHA1Hex,
 			Status:   "not-pdf",
 			Err:      fmt.Errorf("mimetype is %v", fi.Mimetype),
 			FileInfo: fi,
 		}
 	case slices.Contains(BAD_PDF_SHA1HEX, fi.SHA1Hex):
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex:  fi.SHA1Hex,
 			Status:   "bad-pdf",
 			Err:      fmt.Errorf("PDF known to cause processing issues"),
@@ -232,13 +231,13 @@ func ProcessPDF(blob []byte, opts *ProcessPDFOptions) *PDFExtractResult {
 	text, err := extractTextFromPDF(tf.Name())
 	switch {
 	case err != nil:
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "parse-error",
 			Err:     fmt.Errorf("text extraction failed: %w", err),
 		}
 	case len(text) == 0:
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "empty-pdf",
 			Err:     fmt.Errorf("zero length text"),
@@ -248,7 +247,7 @@ func ProcessPDF(blob []byte, opts *ProcessPDFOptions) *PDFExtractResult {
 	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), opts.Dim, opts.ThumbType)
 	switch {
 	case err != nil:
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "parse-error",
 			Err:     fmt.Errorf("thumbnail extraction failed with: %w", err),
@@ -261,13 +260,13 @@ func ProcessPDF(blob []byte, opts *ProcessPDFOptions) *PDFExtractResult {
 	metadata, err := extractPDFMetadata(tf.Name())
 	switch {
 	case err != nil:
-		return &PDFExtractResult{
+		return &Result{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "parse-error",
 			Err:     fmt.Errorf("pdf info extraction failed with: %w", err),
 		}
 	}
-	return &PDFExtractResult{
+	return &Result{
 		SHA1Hex:        fi.SHA1Hex,
 		Status:         "success",
 		Err:            nil,

@@ -36,7 +36,7 @@ func TestPdfExtract(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		result := ProcessPDFFile(c.filename, &ProcessPDFOptions{
+		result := ProcessFile(c.filename, &Options{
 			Dim:       c.dim,
 			ThumbType: "jpg",
 		})
@@ -46,7 +46,7 @@ func TestPdfExtract(t *testing.T) {
 		if result.Status != "success" {
 			continue
 		}
-		var want PDFExtractResult
+		var want Result
 		if _, err := os.Stat(c.snapshot); os.IsNotExist(err) {
 			f, err := os.CreateTemp("", "blobproc-pdf-snapshot-*.json")
 			if err != nil {
@@ -72,7 +72,7 @@ func TestPdfExtract(t *testing.T) {
 			t.Fatalf("snapshot broken: %v", err)
 		}
 		// PDFCPU fields that change on every run.
-		for _, v := range []*PDFExtractResult{
+		for _, v := range []*Result{
 			result,
 			&want,
 		} {
@@ -128,7 +128,7 @@ func TestGenerateFileInfo(t *testing.T) {
 
 func BenchmarkPdfExtract(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		_ = ProcessPDFFile("testdata/pdf/1906.02444.pdf", &ProcessPDFOptions{
+		_ = ProcessFile("testdata/pdf/1906.02444.pdf", &Options{
 			Dim:       Dim{180, 300},
 			ThumbType: "na",
 		})
