@@ -162,14 +162,14 @@ func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 			Err:     fmt.Errorf("zero length text"),
 		}
 	}
-	// Extract the thumbnail
+	// Extract the thumbnail.
 	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), dim)
 	switch {
 	case err != nil:
 		return &PDFExtractResult{
 			SHA1Hex: fi.SHA1Hex,
 			Status:  "parse-error",
-			Err:     fmt.Errorf("thumbnail failed with: %w", err),
+			Err:     fmt.Errorf("thumbnail extraction failed with: %w", err),
 		}
 	case len(page0Thumbail) < 50:
 		// assuming that very small images mean something went wrong

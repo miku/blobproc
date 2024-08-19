@@ -12,21 +12,35 @@ func TestPdfExtract(t *testing.T) {
 	var cases = []struct {
 		filename string
 		dim      Dim
+		status   string
 		snapshot string
 	}{
 		{
 			filename: "testdata/pdf/1906.02444.pdf",
 			dim:      Dim{180, 300},
+			status:   "success",
 			snapshot: "testdata/extract/1906.02444.json",
 		},
 		{
 			filename: "testdata/pdf/1906.11632.pdf",
 			dim:      Dim{180, 300},
+			status:   "success",
 			snapshot: "testdata/extract/1906.11632.json",
+		},
+		{
+			filename: "testdata/misc/wordle.py",
+			dim:      Dim{180, 300},
+			status:   "not-pdf",
 		},
 	}
 	for _, c := range cases {
 		result := ProcessPDFFile(c.filename, c.dim, "na")
+		if result.Status != c.status {
+			t.Fatalf("got %v, want %v", result.Status, c.status)
+		}
+		if result.Status != "success" {
+			continue
+		}
 		var want PDFExtractResult
 		if _, err := os.Stat(c.snapshot); os.IsNotExist(err) {
 			f, err := os.CreateTemp("", "blobproc-pdf-snapshot-*.json")
