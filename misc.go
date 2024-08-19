@@ -15,18 +15,23 @@ import (
 
 var ErrNoData = errors.New("no data")
 
-// FileInfo groups checksum and size for a file. The checksums are all lowercase hex digests.
+// FileInfo groups checksum and size for a file. The checksums are all
+// lowercase hex digests.
 type FileInfo struct {
-	Size      int64
-	SHA1Hex   string
-	SHA256Hex string
-	MD5Hex    string
-	Mimetype  string
+	Size      int64  `json:"size"`
+	SHA1Hex   string `json:"sha1hex"`
+	SHA256Hex string `json:"sha256hex"`
+	MD5Hex    string `json:"md5hex"`
+	Mimetype  string `json:"mimetype"`
 }
 
 // FromBytes creates a FileInfo object from bytes.
 func (fi *FileInfo) FromBytes(p []byte) {
-	var hasher = []hash.Hash{md5.New(), sha1.New(), sha256.New()}
+	var hasher = []hash.Hash{
+		0: md5.New(),
+		1: sha1.New(),
+		2: sha256.New(),
+	}
 	for _, h := range hasher {
 		_, _ = h.Write(p)
 	}

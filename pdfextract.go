@@ -40,6 +40,12 @@ type Dim struct {
 	H int
 }
 
+// ProcessPDFOptions controls the pdf extraction process.
+type ProcessPDFOptions struct {
+	Dim       Dim
+	ThumbType string
+}
+
 // extractTextFromPDF returns the text of the PDF, uses pdftotext.
 func extractTextFromPDF(filename string) ([]byte, error) {
 	if _, err := exec.LookPath("pdftotext"); err != nil {
@@ -102,7 +108,7 @@ func extractPDFMetadata(filename string) (*pdfinfo.Metadata, error) {
 
 // ProcessPDFFile turns a PDF file to a structured output. TODO: group options
 // in a struct, as we may add more.
-func ProcessPDFFile(filename string, dim Dim, thumbType string) *PDFExtractResult {
+func ProcessPDFFile(filename string, opts *ProcessPDFOptions) *PDFExtractResult {
 	f, err := os.Open(filename)
 	if err != nil {
 		return &PDFExtractResult{
@@ -116,12 +122,12 @@ func ProcessPDFFile(filename string, dim Dim, thumbType string) *PDFExtractResul
 			Err: err,
 		}
 	}
-	return ProcessPDF(b, dim, thumbType)
+	return ProcessPDF(b, opts)
 }
 
 // ProcessPDF takes a blob and returns a pdf extract result. TODO: we can makes
 // this faster by running various subprocesses in parallel.
-func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
+func ProcessPDF(blob []byte, opts *ProcessPDFOptions) *PDFExtractResult {
 	var fi = new(FileInfo)
 	fi.FromBytes(blob)
 	// Save PDF blob to a temporary file to run various cli tools over it.
@@ -180,7 +186,7 @@ func ProcessPDF(blob []byte, dim Dim, thumbType string) *PDFExtractResult {
 		}
 	}
 	// Extract the thumbnail.
-	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), dim, thumbType)
+	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), opts.Dim, opts.ThumbType)
 	switch {
 	case err != nil:
 		return &PDFExtractResult{

@@ -34,7 +34,10 @@ func TestPdfExtract(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		result := ProcessPDFFile(c.filename, c.dim, "jpg")
+		result := ProcessPDFFile(c.filename, &ProcessPDFOptions{
+			Dim:       c.dim,
+			ThumbType: "jpg",
+		})
 		if result.Status != c.status {
 			t.Fatalf("got %v, want %v", result.Status, c.status)
 		}
@@ -85,6 +88,9 @@ func TestPdfExtract(t *testing.T) {
 
 func BenchmarkPdfExtract(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		_ = ProcessPDFFile("testdata/pdf/1906.02444.pdf", Dim{180, 300}, "na")
+		_ = ProcessPDFFile("testdata/pdf/1906.02444.pdf", &ProcessPDFOptions{
+			Dim:       Dim{180, 300},
+			ThumbType: "na",
+		})
 	}
 }
