@@ -1,6 +1,7 @@
 package pdfextract
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestPdfExtract(t *testing.T) {
@@ -127,7 +129,7 @@ func TestPdfExtract(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		result := ProcessFile(c.filename, &Options{
+		result := ProcessFile(context.Background(), c.filename, &Options{
 			Dim:       c.dim,
 			ThumbType: "jpg",
 		})
@@ -174,11 +176,11 @@ func TestPdfExtract(t *testing.T) {
 		if !cmp.Equal(result, &want) {
 			// If we fail, we write the result JSON to a tempfile for later
 			// inspection or snapshot creation.
-			t.Fatalf("diff: %v", cmp.Diff(result, &want))
+			t.Fatalf("diff: %v", cmp.Diff(result, &want, cmpopts.EquateEmpty()))
 		}
 		// Check link extraction.
-		if !cmp.Equal(result.Weblinks(), c.links) {
-			t.Fatalf("diff: %v", cmp.Diff(result.Weblinks(), c.links))
+		if !cmp.Equal(result.Weblinks, c.links) {
+			t.Fatalf("diff: %v", cmp.Diff(result.Weblinks, c.links))
 		}
 	}
 }
@@ -223,7 +225,7 @@ func TestGenerateFileInfo(t *testing.T) {
 
 func BenchmarkPdfExtract(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		_ = ProcessFile("testdata/pdf/1906.02444.pdf", &Options{
+		_ = ProcessFile(context.Background(), "testdata/pdf/1906.02444.pdf", &Options{
 			Dim:       Dim{180, 300},
 			ThumbType: "na",
 		})

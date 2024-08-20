@@ -1,6 +1,7 @@
 package pdfinfo
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -97,7 +98,7 @@ func TestParseFile(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		info, err := runPdfInfo(c.filename)
+		info, err := runPdfInfo(context.Background(), c.filename)
 		if err != c.err {
 			t.Fatalf("got %v, want %v", err, c.err)
 		}

@@ -50,7 +50,7 @@ func main() {
 			log.Fatal(result.Err)
 		}
 		if result.Status != "success" {
-			log.Fatal("process failed with: %v", result.Status)
+			log.Fatalf("process failed with: %v", result.Status)
 		}
 		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
 			log.Fatal(err)
