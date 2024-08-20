@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"log/slog"
@@ -29,6 +30,7 @@ var (
 	debug             = flag.Bool("debug", false, "more verbose output")
 	timeout           = flag.Duration("T", 300*time.Second, "subprocess timeout")
 	keepSpool         = flag.Bool("k", false, "keep files in spool after processing, only for debugging")
+	showVersion       = flag.Bool("version", false, "show version")
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
 	grobidMaxFileSize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
 	s3Endpoint        = flag.String("s3", "localhost:9000", "S3 endpoint")
@@ -39,6 +41,8 @@ var (
 func main() {
 	flag.Parse()
 	switch {
+	case *showVersion:
+		fmt.Println(blobproc.Version)
 	case *singleFile != "":
 		// Run a single file through local commands only.
 		ctx, cancel := context.WithTimeout(context.Background(), *timeout)

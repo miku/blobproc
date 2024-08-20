@@ -24,7 +24,7 @@ var (
 	timeout    = flag.Duration("T", 15*time.Second, "server timeout")
 
 	banner        = `{"id": "blobprocd", "about": "Send your PDF payload to %s/spool - a 200 OK status only confirms receipt, not successful postprocessing, which may take more time. Check Location header for spool id."}`
-	showVersion   = flag.Bool("v", false, "show version")
+	showVersion   = flag.Bool("version", false, "show version")
 	debug         = flag.Bool("debug", false, "switch to log level DEBUG")
 	accessLogFile = flag.String("access-log", "", "server access logfile, none if empty")
 	logFile       = flag.String("log", "", "structured log output file, stderr if empty")
