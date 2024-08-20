@@ -89,6 +89,7 @@ type Result struct {
 	Metadata       *pdfinfo.Metadata `json:"metadata,omitempty"`       // New, grouped by tool, info about a pdf.
 	PDFExtra       *pdfinfo.PDFExtra `json:"pdfextra,omitempty"`       // pdfextra, as provided by sandcrawler
 	Source         json.RawMessage   `json:"source,omitempty"`         // Unassigned.
+	Weblinks       []string          `json:"weblinks,omitempty"`       // Extracted link candidates from fulltext.
 }
 
 // HasPage0Thumbnail is a derived property.
@@ -96,18 +97,15 @@ func (result *Result) HasPage0Thumbnail() bool {
 	return len(result.Page0Thumbnail) > 50
 }
 
-// Weblinks returns all found web urls.
-func (result *Result) Weblinks() (links []string) {
+func extractWeblinks(s string) (links []string) {
 	rx := xurls.Strict()
-	for _, u := range rx.FindAllString(result.Text, -1) {
+	for _, u := range rx.FindAllString(s, -1) {
 		u = strings.TrimSpace(u)
 		u = strings.Replace(u, "\u200b", "", -1)
-		if slices.Contains(links, u) {
-			continue
-		}
 		links = append(links, u)
 	}
 	sort.Strings(links)
+	links = slices.Compact(links)
 	return
 }
 
@@ -286,6 +284,7 @@ func ProcessBlob(ctx context.Context, blob []byte, opts *Options) *Result {
 			Err:     fmt.Errorf("pdf info extraction failed with: %w", err),
 		}
 	}
+	weblinks := extractWeblinks(string(text))
 	return &Result{
 		SHA1Hex:        fi.SHA1Hex,
 		Status:         "success",
@@ -295,6 +294,7 @@ func ProcessBlob(ctx context.Context, blob []byte, opts *Options) *Result {
 		Page0Thumbnail: page0Thumbail,
 		Metadata:       metadata,
 		PDFExtra:       metadata.LegacyPDFExtra(),
+		Weblinks:       weblinks,
 	}
 }
 

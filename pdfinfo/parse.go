@@ -45,71 +45,76 @@ type PDFExtra struct {
 // PDFCPU structured output from pdfcpu tool.
 type PDFCPU struct {
 	Header struct {
-		Creation string `json:"creation"`
-		Version  string `json:"version"`
-	} `json:"header"`
+		Creation string `json:"creation,omitempty"`
+		Version  string `json:"version,omitempty"`
+	} `json:"header,omitempty"`
 	Infos []struct {
-		AppendOnly       bool     `json:"appendOnly"`
-		Author           string   `json:"author"`
-		Bookmarks        bool     `json:"bookmarks"`
-		CreationDate     string   `json:"creationDate"`
-		Creator          string   `json:"creator"`
-		Encrypted        bool     `json:"encrypted"`
-		Form             bool     `json:"form"`
-		Hybrid           bool     `json:"hybrid"`
-		Keywords         []string `json:"keywords"`
-		Linearized       bool     `json:"linearized"`
-		ModificationDate string   `json:"modificationDate"`
-		Names            bool     `json:"names"`
-		PageCount        int64    `json:"pageCount"`
-		PageMode         string   `json:"pageMode"`
+		AppendOnly       bool     `json:"appendOnly,omitempty"`
+		Author           string   `json:"author,omitempty"`
+		Bookmarks        bool     `json:"bookmarks,omitempty"`
+		CreationDate     string   `json:"creationDate,omitempty"`
+		Creator          string   `json:"creator,omitempty"`
+		Encrypted        bool     `json:"encrypted,omitempty"`
+		Form             bool     `json:"form,omitempty"`
+		Hybrid           bool     `json:"hybrid,omitempty"`
+		Keywords         []string `json:"keywords,omitempty"`
+		Linearized       bool     `json:"linearized,omitempty"`
+		ModificationDate string   `json:"modificationDate,omitempty"`
+		Names            bool     `json:"names,omitempty"`
+		PageCount        int64    `json:"pageCount,omitempty"`
+		PageMode         string   `json:"pageMode,omitempty"`
 		PageSizes        []struct {
-			Height float64 `json:"height"`
-			Width  float64 `json:"width"`
-		} `json:"pageSizes"`
-		Permissions int64  `json:"permissions"`
-		Producer    string `json:"producer"`
+			Height float64 `json:"height,omitempty"`
+			Width  float64 `json:"width,omitempty"`
+		} `json:"pageSizes,omitempty"`
+		Permissions int64  `json:"permissions,omitempty"`
+		Producer    string `json:"producer,omitempty"`
 		Properties  struct {
-			PTEXFullbanner string `json:"PTEX.Fullbanner"`
-		} `json:"properties"`
-		Signatures         bool   `json:"signatures"`
-		Source             string `json:"source"`
-		Subject            string `json:"subject"`
-		Tagged             bool   `json:"tagged"`
-		Thumbnails         bool   `json:"thumbnails"`
-		Title              string `json:"title"`
-		Unit               string `json:"unit"`
-		UsingObjectStreams bool   `json:"usingObjectStreams"`
-		UsingXRefStreams   bool   `json:"usingXRefStreams"`
-		Version            string `json:"version"`
-		Watermarked        bool   `json:"watermarked"`
-	} `json:"infos"`
+			PTEXFullbanner string `json:"PTEX.Fullbanner,omitempty"`
+		} `json:"properties,omitempty"`
+		Signatures         bool   `json:"signatures,omitempty"`
+		Source             string `json:"source,omitempty"`
+		Subject            string `json:"subject,omitempty"`
+		Tagged             bool   `json:"tagged,omitempty"`
+		Thumbnails         bool   `json:"thumbnails,omitempty"`
+		Title              string `json:"title,omitempty"`
+		Unit               string `json:"unit,omitempty"`
+		UsingObjectStreams bool   `json:"usingObjectStreams,omitempty"`
+		UsingXRefStreams   bool   `json:"usingXRefStreams,omitempty"`
+		Version            string `json:"version,omitempty"`
+		Watermarked        bool   `json:"watermarked,omitempty"`
+	} `json:"infos,omitempty"`
 }
 
 // Info is a parsed pdfinfo output.
 type Info struct {
-	Title          string `json:"title"`
-	Subject        string `json:"subject"`
-	Keywords       string `json:"keywords"`
-	Author         string `json:"author"`
-	Creator        string `json:"creator"`
-	Producer       string `json:"producer"`
-	CreationDate   string `json:"creation_date"`
-	ModDate        string `json:"mod_date"`
-	CustomMetadata bool   `json:"custom_metadata"`
-	MetadataStream bool   `json:"metadata_stream"`
-	Tagged         bool   `json:"tagged"`
-	UserProperties bool   `json:"user_properties"`
-	Suspects       bool   `json:"suspects"`
-	Form           string `json:"form"`
-	JavaScript     bool   `json:"javascript"`
-	Pages          int    `json:"pages"`
-	Encrypted      bool   `json:"encrypted"`
-	PageSize       string `json:"page_size"` // 595.276 x 841.89 pts (A4)
-	PageRot        int    `json:"page_rot"`
-	FileSize       int    `json:"filesize"`
-	Optimized      bool   `json:"optimized"`
-	PDFVersion     string `json:"pdf_version"`
+	Title          string `json:"title,omitempty"`
+	Subject        string `json:"subject,omitempty"`
+	Keywords       string `json:"keywords,omitempty"`
+	Author         string `json:"author,omitempty"`
+	Creator        string `json:"creator,omitempty"`
+	Producer       string `json:"producer,omitempty"`
+	CreationDate   string `json:"creation_date,omitempty"`
+	ModDate        string `json:"mod_date,omitempty"`
+	CustomMetadata bool   `json:"custom_metadata,omitempty"`
+	MetadataStream bool   `json:"metadata_stream,omitempty"`
+	Tagged         bool   `json:"tagged,omitempty"`
+	UserProperties bool   `json:"user_properties,omitempty"`
+	Suspects       bool   `json:"suspects,omitempty"`
+	Form           string `json:"form,omitempty"`
+	JavaScript     bool   `json:"javascript,omitempty"`
+	Pages          int    `json:"pages,omitempty"`
+	Encrypted      bool   `json:"encrypted,omitempty"`
+	PageSize       string `json:"page_size,omitempty"`
+	PageRot        int    `json:"page_rot,omitempty"`
+	FileSize       int    `json:"filesize,omitempty"`
+	Optimized      bool   `json:"optimized,omitempty"`
+	PDFVersion     string `json:"pdf_version,omitempty"`
+	PDFSubtype     string `json:"pdf_subtype,omitempty"`
+	Abbreviation   string `json:"abbreviation,omitempty"`
+	Subtitle       string `json:"subtitle,omitempty"`
+	Standard       string `json:"standard,omitempty"`
+	Conformance    string `json:"conformance,omitempty"`
 }
 
 // Dim groups width and height of a page.
@@ -251,6 +256,16 @@ func ParseInfo(s string) *Info {
 			info.Optimized = parseBool(fields[1])
 		case "PDF version":
 			info.PDFVersion = fields[1]
+		case "PDF subtype":
+			info.PDFSubtype = fields[1]
+		case "Abbreviation":
+			info.Abbreviation = fields[1]
+		case "Subtitle":
+			info.Subtitle = fields[1]
+		case "Standard":
+			info.Standard = fields[1]
+		case "Conformance":
+			info.Conformance = fields[1]
 		default:
 			log.Printf("ignoring pdfinfo field: %v", fields[0])
 		}
