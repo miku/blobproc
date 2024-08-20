@@ -56,6 +56,16 @@ This tool should cover most of the following areas from sandcrawler:
 
 Including references workers.
 
+Performance: Processing 1605 pdfs, 1515 successful, 2.23 docs/s, when processed
+in parallel, via `fd ... -x` - or about 200K docs per day.
+
+```
+real    11m0.767s
+user    73m57.763s
+sys     5m55.393s
+```
+
 ----
 
 Image credit: [SD](https://github.com/CompVis/stable-diffusion)
+

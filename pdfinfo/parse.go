@@ -2,6 +2,7 @@ package pdfinfo
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -144,7 +145,7 @@ func (info *Info) PageDim() Dim {
 }
 
 // ParseFile a filename into a structured metadata object. Requires pdfinfo and pdfcpu to be installed.
-func ParseFile(filename string) (*Metadata, error) {
+func ParseFile(ctx context.Context, filename string) (*Metadata, error) {
 	if _, err := exec.LookPath("pdfcpu"); err != nil {
 		return nil, fmt.Errorf("missing pdfcpu executable")
 	}
@@ -152,12 +153,12 @@ func ParseFile(filename string) (*Metadata, error) {
 		return nil, fmt.Errorf("missing pdfinfo executable")
 	}
 	var metadata = new(Metadata)
-	info, err := runPdfInfo(filename)
+	info, err := runPdfInfo(ctx, filename)
 	if err != nil {
 		return nil, err
 	}
 	metadata.PDFInfo = info
-	pdfcpu, err := runPdfCpu(filename)
+	pdfcpu, err := runPdfCpu(ctx, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -166,9 +167,9 @@ func ParseFile(filename string) (*Metadata, error) {
 }
 
 // ParseFile parses a pdf file. Requires pdfinfo executable to be installed.
-func runPdfCpu(filename string) (*PDFCPU, error) {
+func runPdfCpu(ctx context.Context, filename string) (*PDFCPU, error) {
 	var buf bytes.Buffer
-	cmd := exec.Command("pdfcpu", "info", "-j", filename)
+	cmd := exec.CommandContext(ctx, "pdfcpu", "info", "-j", filename)
 	cmd.Stdout = &buf
 	if err := cmd.Run(); err != nil {
 		return nil, err
@@ -181,9 +182,9 @@ func runPdfCpu(filename string) (*PDFCPU, error) {
 }
 
 // runPdfInfo parses a pdf file. Requires pdfinfo executable to be installed.
-func runPdfInfo(filename string) (*Info, error) {
+func runPdfInfo(ctx context.Context, filename string) (*Info, error) {
 	var buf bytes.Buffer
-	cmd := exec.Command("pdfinfo", filename)
+	cmd := exec.CommandContext(ctx, "pdfinfo", filename)
 	cmd.Stdout = &buf
 	if err := cmd.Run(); err != nil {
 		return nil, err

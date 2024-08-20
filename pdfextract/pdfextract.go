@@ -2,6 +2,7 @@ package pdfextract
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -123,12 +124,12 @@ type Options struct {
 }
 
 // extractTextFromPDF returns the text of the PDF, uses pdftotext.
-func extractTextFromPDF(filename string) ([]byte, error) {
+func extractTextFromPDF(ctx context.Context, filename string) ([]byte, error) {
 	if _, err := exec.LookPath("pdftotext"); err != nil {
 		return nil, fmt.Errorf("missing pdftotext executable")
 	}
 	var buf bytes.Buffer
-	cmd := exec.Command("pdftotext", filename, "-")
+	cmd := exec.CommandContext(ctx, "pdftotext", filename, "-")
 	cmd.Stdout = &buf
 	if err := cmd.Run(); err != nil {
 		return nil, err
@@ -138,7 +139,7 @@ func extractTextFromPDF(filename string) ([]byte, error) {
 }
 
 // extractThumbnailFromPDF runs pdftoppm to render page0 of the PDF into an image.
-func extractThumbnailFromPDF(filename string, dim Dim, thumbType string) ([]byte, error) {
+func extractThumbnailFromPDF(ctx context.Context, filename string, dim Dim, thumbType string) ([]byte, error) {
 	if dim.W < 0 && dim.H < 0 {
 		return nil, nil
 	}
@@ -163,7 +164,7 @@ func extractThumbnailFromPDF(filename string, dim Dim, thumbType string) ([]byte
 	default:
 		formatFlag = "-jpeg"
 	}
-	cmd := exec.Command("pdftoppm",
+	cmd := exec.CommandContext(ctx, "pdftoppm",
 		formatFlag,
 		"-f", "1",
 		"-l", "1",
@@ -179,13 +180,13 @@ func extractThumbnailFromPDF(filename string, dim Dim, thumbType string) ([]byte
 }
 
 // extractPDFMetadata extracts the PDF info via pdfcpu as raw JSON bytes.
-func extractPDFMetadata(filename string) (*pdfinfo.Metadata, error) {
-	return pdfinfo.ParseFile(filename)
+func extractPDFMetadata(ctx context.Context, filename string) (*pdfinfo.Metadata, error) {
+	return pdfinfo.ParseFile(ctx, filename)
 }
 
 // ProcessFile turns a PDF file to a structured output. TODO: group options
 // in a struct, as we may add more.
-func ProcessFile(filename string, opts *Options) *Result {
+func ProcessFile(ctx context.Context, filename string, opts *Options) *Result {
 	f, err := os.Open(filename)
 	if err != nil {
 		return &Result{
@@ -199,12 +200,12 @@ func ProcessFile(filename string, opts *Options) *Result {
 			Err: err,
 		}
 	}
-	return ProcessBlob(b, opts)
+	return ProcessBlob(ctx, b, opts)
 }
 
 // ProcessBlob takes a blob and returns a pdf extract result. TODO: we can makes
 // this faster by running various subprocesses in parallel.
-func ProcessBlob(blob []byte, opts *Options) *Result {
+func ProcessBlob(ctx context.Context, blob []byte, opts *Options) *Result {
 	var fi = new(FileInfo)
 	fi.FromBytes(blob)
 	// Save PDF blob to a temporary file to run various cli tools over it.
@@ -247,7 +248,7 @@ func ProcessBlob(blob []byte, opts *Options) *Result {
 		}
 	}
 	// Extract the fulltext.
-	text, err := extractTextFromPDF(tf.Name())
+	text, err := extractTextFromPDF(ctx, tf.Name())
 	switch {
 	case err != nil:
 		return &Result{
@@ -263,7 +264,7 @@ func ProcessBlob(blob []byte, opts *Options) *Result {
 		}
 	}
 	// Extract the thumbnail.
-	page0Thumbail, err := extractThumbnailFromPDF(tf.Name(), opts.Dim, opts.ThumbType)
+	page0Thumbail, err := extractThumbnailFromPDF(ctx, tf.Name(), opts.Dim, opts.ThumbType)
 	switch {
 	case err != nil:
 		return &Result{
@@ -276,7 +277,7 @@ func ProcessBlob(blob []byte, opts *Options) *Result {
 		page0Thumbail = nil
 	}
 	// Extract additional pdf info.
-	metadata, err := extractPDFMetadata(tf.Name())
+	metadata, err := extractPDFMetadata(ctx, tf.Name())
 	switch {
 	case err != nil:
 		return &Result{

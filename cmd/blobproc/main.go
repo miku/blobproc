@@ -1,29 +1,37 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"io/fs"
+	"log"
 	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/miku/blobproc"
+	"github.com/miku/blobproc/pdfextract"
 	"github.com/miku/blobproc/pidfile"
 	"github.com/miku/grobidclient"
 )
 
 var (
+	singleFile = flag.String("f", "", "process a single file")
+
 	spoolDir = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
 	pidFile  = flag.String("pidfile", path.Join(xdg.RuntimeDir, "webspool.pid"), "pidfile")
 	logFile  = flag.String("log", "", "structured log output file, stderr if empty")
 	debug    = flag.Bool("debug", false, "more verbose output")
-	// GROBID related
+	timeout  = flag.Duration("T", 300*time.Second, "subprocess timeout")
+
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
 	consolidateMode   = flag.Bool("consolidate-mode", false, "consolidate mode")
 	maxGrobidFilesize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
-	// S3 related
+
 	s3          = flag.String("s3", "", "S3 endpoint") // TODO: access key in env
 	s3AccessKey = flag.String("s3-access-key", "minioadmin", "S3 access key")
 	s3SecretKey = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
@@ -31,6 +39,24 @@ var (
 
 func main() {
 	flag.Parse()
+	if *singleFile != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+		defer cancel()
+		result := pdfextract.ProcessFile(ctx, *singleFile, &pdfextract.Options{
+			Dim:       pdfextract.Dim{180, 300},
+			ThumbType: "JPEG"},
+		)
+		if result.Err != nil {
+			log.Fatal(result.Err)
+		}
+		if result.Status != "success" {
+			log.Fatal("process failed with: %v", result.Status)
+		}
+		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			log.Fatal(err)
+		}
+		os.Exit(0)
+	}
 	if err := pidfile.Write(*pidFile, os.Getpid()); err != nil {
 		slog.Error("exiting", "err", err, "pidfile", "*pidFile")
 		os.Exit(1)
