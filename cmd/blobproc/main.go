@@ -22,22 +22,18 @@ import (
 )
 
 var (
-	singleFile = flag.String("f", "", "process a single file")
-
-	spoolDir  = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
-	pidFile   = flag.String("pidfile", path.Join(xdg.RuntimeDir, "blobproc.pid"), "pidfile")
-	logFile   = flag.String("log", "", "structured log output file, stderr if empty")
-	debug     = flag.Bool("debug", false, "more verbose output")
-	timeout   = flag.Duration("T", 300*time.Second, "subprocess timeout")
-	keepSpool = flag.Bool("k", false, "keep files in spool after processing, only for debugging")
-
+	singleFile        = flag.String("f", "", "process a single file (local tools only), for testing")
+	spoolDir          = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
+	pidFile           = flag.String("pidfile", path.Join(xdg.RuntimeDir, "blobproc.pid"), "pidfile")
+	logFile           = flag.String("logfile", "", "structured log output file, stderr if empty")
+	debug             = flag.Bool("debug", false, "more verbose output")
+	timeout           = flag.Duration("T", 300*time.Second, "subprocess timeout")
+	keepSpool         = flag.Bool("k", false, "keep files in spool after processing, only for debugging")
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
-	consolidateMode   = flag.Bool("consolidate-mode", false, "consolidate mode")
-	maxGrobidFilesize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
-
-	s3          = flag.String("s3", "localhost:9000", "S3 endpoint")
-	s3AccessKey = flag.String("s3-access-key", "minioadmin", "S3 access key")
-	s3SecretKey = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
+	grobidMaxFileSize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
+	s3Endpoint        = flag.String("s3", "localhost:9000", "S3 endpoint")
+	s3AccessKey       = flag.String("s3-access-key", "minioadmin", "S3 access key")
+	s3SecretKey       = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
 )
 
 func main() {
@@ -62,6 +58,14 @@ func main() {
 		}
 	default:
 		// By default, try to work through the whole spool dir.
+		//
+		// This whole block of code is reading files from disk, processing them
+		// through various tools and services and persists the results in S3.
+		// The spool directory is the queue and it gets cleanup up, once the
+		// file has been processed, even if just partially.
+		//
+		// You should be able to just add files to the spool folder again to
+		// process them and to overwrite previous results in S3.
 		if err := pidfile.Write(*pidFile, os.Getpid()); err != nil {
 			slog.Error("exiting", "err", err, "pidfile", "*pidFile")
 			os.Exit(1)
@@ -91,8 +95,8 @@ func main() {
 		slog.SetDefault(logger)
 		// Setup external services and data stores.
 		grobid := grobidclient.New(*grobidHost)
-		slog.Info("initialize grobid client", "host", *grobidHost)
-		wrapS3, err := blobproc.NewWrapS3(*s3, &blobproc.WrapS3Options{
+		slog.Info("grobid client", "host", *grobidHost)
+		wrapS3, err := blobproc.NewWrapS3(*s3Endpoint, &blobproc.WrapS3Options{
 			AccessKey:     *s3AccessKey,
 			SecretKey:     *s3SecretKey,
 			DefaultBucket: "sandcrawler",
@@ -100,9 +104,9 @@ func main() {
 		})
 		if err != nil {
 			slog.Error("cannot access S3", "err", err)
-			os.Exit(1)
+			log.Fatalf("cannot access S3: %v", err)
 		}
-		slog.Info("initialized s3 wrapper", "host", *s3)
+		slog.Info("s3 wrapper", "endendpointt", *s3Endpoint)
 		// Walk the spool directory and process one file after another. Run
 		// local tools and send PDF to grobid, persist all results into S3.
 		//
@@ -177,7 +181,7 @@ func main() {
 					}
 				}
 			}
-			if info.Size() > *maxGrobidFilesize {
+			if info.Size() > *grobidMaxFileSize {
 				slog.Warn("skipping too large file", "path", path, "size", info.Size())
 				return nil
 			}
