@@ -40,7 +40,7 @@ var (
 	showVersion       = flag.Bool("version", false, "show version")
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
 	grobidMaxFileSize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
-	s3Endpoint        = flag.String("s3", "localhost:9000", "S3 endpoint")
+	s3Endpoint        = flag.String("s3-endpoint", "localhost:9000", "S3 endpoint")
 	s3AccessKey       = flag.String("s3-access-key", "minioadmin", "S3 access key")
 	s3SecretKey       = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
 )
