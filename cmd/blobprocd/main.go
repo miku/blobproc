@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	spoolDir   = flag.String("spool", path.Join(xdg.DataHome, "/webspool/spool"), "")
+	spoolDir   = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
 	listenAddr = flag.String("addr", "0.0.0.0:8000", "host port to listen on")
 	timeout    = flag.Duration("T", 15*time.Second, "server timeout")
 
