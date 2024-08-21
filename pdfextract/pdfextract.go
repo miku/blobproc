@@ -127,7 +127,7 @@ func extractTextFromPDF(ctx context.Context, filename string) ([]byte, error) {
 		return nil, fmt.Errorf("missing pdftotext executable")
 	}
 	var buf bytes.Buffer
-	cmd := exec.CommandContext(ctx, "pdftotext", filename, "-")
+	cmd := exec.CommandContext(ctx, "pdftotext", "-layout", filename, "-")
 	cmd.Stdout = &buf
 	if err := cmd.Run(); err != nil {
 		return nil, err

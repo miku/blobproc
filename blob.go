@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -11,6 +12,15 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
+
+var (
+	ErrFileTooLarge = errors.New("file too large")
+	ErrInvalidHash  = errors.New("invalid hash")
+	// DefaultBucker for S3
+	DefaultBucket = "sandcrawler"
+)
+
+// Runner
 
 // WrapS3 slightly wraps I/O around our S3 store with convenience methods.
 type WrapS3 struct {

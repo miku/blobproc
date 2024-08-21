@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -19,7 +18,6 @@ import (
 	"github.com/miku/blobproc/pdfextract"
 	"github.com/miku/blobproc/pidfile"
 	"github.com/miku/grobidclient"
-	"github.com/miku/grobidclient/tei"
 )
 
 var docs = `blobproc - process and persist PDF documents
@@ -170,7 +168,7 @@ func main() {
 						Folder:  "pdf",
 						Blob:    result.Page0Thumbnail,
 						SHA1Hex: result.SHA1Hex,
-						Ext:     "jpg",
+						Ext:     "180px.jpg",
 						Prefix:  "",
 					}
 					resp, err := wrapS3.PutBlob(ctx, &opts)
@@ -213,25 +211,15 @@ func main() {
 				SegmentSentences:       true,
 			})
 			switch {
-			case err != nil:
+			case err != nil || gres.Err != nil:
 				slog.Warn("grobid failed", "err", err)
 				return nil
 			default:
-				doc, err := tei.ParseDocument(bytes.NewReader(gres.Body))
-				if err != nil {
-					slog.Warn("could not parse grobid output", "len", len(gres.Body), "err", err)
-					return nil
-				}
-				var buf bytes.Buffer
-				if err := json.NewEncoder(&buf).Encode(doc); err != nil {
-					slog.Warn("could not encode TEI XML as JSON", "err", err)
-					return nil
-				}
 				opts := blobproc.BlobRequestOptions{
 					Bucket:  "sandcrawler",
 					Folder:  "grobid",
-					Blob:    buf.Bytes(),
-					SHA1Hex: result.SHA1Hex,
+					Blob:    gres.Body,
+					SHA1Hex: gres.SHA1Hex,
 					Ext:     "tei.xml",
 					Prefix:  "",
 				}
