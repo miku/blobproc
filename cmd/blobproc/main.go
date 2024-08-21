@@ -22,6 +22,15 @@ import (
 	"github.com/miku/grobidclient/tei"
 )
 
+var docs = `blobproc - process and persist PDF documents
+
+Emit JSON with locally extracted data:
+
+  $ blobproc -f file.pdf | jq .
+
+Flags
+`
+
 var (
 	singleFile        = flag.String("f", "", "process a single file (local tools only), for testing")
 	spoolDir          = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
@@ -29,7 +38,7 @@ var (
 	logFile           = flag.String("logfile", "", "structured log output file, stderr if empty")
 	debug             = flag.Bool("debug", false, "more verbose output")
 	timeout           = flag.Duration("T", 300*time.Second, "subprocess timeout")
-	keepSpool         = flag.Bool("k", false, "keep files in spool after processing, only for debugging")
+	keepSpool         = flag.Bool("k", false, "keep files in spool after processing, mainly for debugging")
 	showVersion       = flag.Bool("version", false, "show version")
 	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
 	grobidMaxFileSize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
@@ -39,6 +48,10 @@ var (
 )
 
 func main() {
+	flag.Usage = func() {
+		_, _ = fmt.Fprintln(os.Stderr, docs)
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	switch {
 	case *showVersion:
