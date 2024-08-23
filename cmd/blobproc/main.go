@@ -16,7 +16,6 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/miku/blobproc"
 	"github.com/miku/blobproc/pdfextract"
-	"github.com/miku/blobproc/pidfile"
 	"github.com/miku/grobidclient"
 )
 
@@ -32,7 +31,6 @@ Flags
 var (
 	singleFile        = flag.String("f", "", "process a single file (local tools only), for testing")
 	spoolDir          = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
-	pidFile           = flag.String("pidfile", path.Join(xdg.RuntimeDir, "blobproc.pid"), "pidfile")
 	logFile           = flag.String("logfile", "", "structured log output file, stderr if empty")
 	debug             = flag.Bool("debug", false, "more verbose output")
 	timeout           = flag.Duration("T", 300*time.Second, "subprocess timeout")
@@ -81,11 +79,7 @@ func main() {
 		//
 		// You should be able to just add files to the spool folder again to
 		// process them and to overwrite previous results in S3.
-		if err := pidfile.Write(*pidFile, os.Getpid()); err != nil {
-			slog.Error("exiting", "err", err, "pidfile", "*pidFile")
-			os.Exit(1)
-		}
-		defer os.Remove(*pidFile)
+		//
 		// Various logging setups.
 		var (
 			logLevel = slog.LevelInfo

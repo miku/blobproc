@@ -75,8 +75,6 @@ Flags
   -k    keep files in spool after processing, mainly for debugging
   -logfile string
         structured log output file, stderr if empty
-  -pidfile string
-        pidfile (default "/run/user/1000/blobproc.pid")
   -s3-access-key string
         S3 access key (default "minioadmin")
   -s3-endpoint string
