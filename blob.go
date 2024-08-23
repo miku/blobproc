@@ -17,11 +17,8 @@ import (
 var (
 	ErrFileTooLarge = errors.New("file too large")
 	ErrInvalidHash  = errors.New("invalid hash")
-	// DefaultBucker for S3
-	DefaultBucket = "sandcrawler"
+	DefaultBucket   = "sandcrawler" // DefaultBucket for S3
 )
-
-// Runner
 
 // WrapS3 slightly wraps I/O around our S3 store with convenience methods.
 type WrapS3 struct {
@@ -41,7 +38,8 @@ type WrapS3Options struct {
 func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 	client, err := minio.New(endpoint,
 		&minio.Options{
-			// Note seaweedfs may not work with V4!
+			// Note: seaweedfs (version 8000GB 1.79 linux amd64) may not work
+			// with V4!
 			Creds:  credentials.NewStaticV2(opts.AccessKey, opts.SecretKey, ""),
 			Secure: opts.UseSSL,
 		},
@@ -49,11 +47,12 @@ func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Quick, additional sanity check if we can connect to S3.
 	buckets, err := client.ListBuckets(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("could not list S3 buckets: %w", err)
 	}
-	slog.Info("S3 client ok", "n", len(buckets))
+	slog.Info("S3 client ok", "num_buckets", len(buckets))
 	for _, bucket := range buckets {
 		slog.Debug("found bucket", "bucket", bucket.Name)
 	}
@@ -93,7 +92,7 @@ type PutBlobResponse struct {
 }
 
 // blobPath returns the path for a given folder, content hash, extension and
-// prefix. Panic if sha1hex is not a length 40 string.
+// prefix. Panics if sha1hex is not a length 40 string.
 func blobPath(folder, sha1hex, ext, prefix string) string {
 	if len(ext) > 0 && !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
@@ -102,7 +101,10 @@ func blobPath(folder, sha1hex, ext, prefix string) string {
 		prefix, folder, sha1hex[0:2], sha1hex[2:4], sha1hex, ext)
 }
 
-// PutBlob takes a data to be put into S3 and saves it.
+// PutBlob takes puts data in to S3 with key derived from the given options. If
+// the options do not contain the SHA1 of the content, it gets computed here.
+// If no bucket name is given, a default bucket name is used. If the bucket
+// does not exist, if gets created.
 func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutBlobResponse, error) {
 	if req.SHA1Hex == "" {
 		h := sha1.New()

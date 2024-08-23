@@ -1,4 +1,4 @@
-// blobprocd takes binary blobs via HTTP POST and save them to disk.
+// blobprocd takes blobs via HTTP POST or PUT and saves them to disk.
 package main
 
 import (
@@ -19,10 +19,9 @@ import (
 )
 
 var (
-	spoolDir   = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
-	listenAddr = flag.String("addr", "0.0.0.0:8000", "host port to listen on")
-	timeout    = flag.Duration("T", 15*time.Second, "server timeout")
-
+	spoolDir      = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
+	listenAddr    = flag.String("addr", "0.0.0.0:8000", "host port to listen on")
+	timeout       = flag.Duration("T", 15*time.Second, "server timeout")
 	banner        = `{"id": "blobprocd", "about": "Send your PDF payload to %s/spool - a 200 OK status only confirms receipt, not successful postprocessing, which may take more time. Check Location header for spool id."}`
 	showVersion   = flag.Bool("version", false, "show version")
 	debug         = flag.Bool("debug", false, "switch to log level DEBUG")

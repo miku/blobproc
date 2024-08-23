@@ -42,7 +42,8 @@ type PDFExtra struct {
 	PDFVersion  string  `json:"pdf_version,omitempty"`  // PDF version: 1.5, ...
 }
 
-// PDFCPU structured output from pdfcpu tool.
+// PDFCPU structured output from pdfcpu tool. One annoyance of pdfcpu is that
+// it expect the file to have a .pdf extenstion (that's so weird!).
 type PDFCPU struct {
 	Header struct {
 		Creation string `json:"creation,omitempty"`
@@ -123,6 +124,8 @@ type Dim struct {
 	Height float64
 }
 
+// PageDim parses pdfinfo page size ourput into a Dim. Returns the zero value
+// Dim for unparsable data.
 func (info *Info) PageDim() Dim {
 	if info == nil {
 		return Dim{}
@@ -284,7 +287,6 @@ func parseBool(s string) bool {
 func parseInt(s string) int {
 	v, err := strconv.Atoi(s)
 	if err != nil {
-		log.Println(err)
 		return 0
 	}
 	return v

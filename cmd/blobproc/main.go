@@ -20,7 +20,7 @@ import (
 	"github.com/miku/grobidclient"
 )
 
-var docs = `blobproc - process and persist PDF documents derivations
+var docs = `blobproc - process and persist PDF derivatives
 
 Emit JSON with locally extracted data:
 
@@ -71,17 +71,19 @@ func main() {
 			log.Fatal(err)
 		}
 	default:
-		// By default, try to work through the whole spool dir.
+		// By default, try to work through the whole spool dir, file by file.
 		//
-		// This whole block of code is reading files from disk, processing them
+		// This whole block of code does reading files from disk, processing them
 		// through various tools and services and persists the results in S3.
+		//
 		// The spool directory is the queue and it gets cleanup up, once the
 		// file has been processed, even if just partially.
 		//
 		// You should be able to just add files to the spool folder again to
 		// process them and to overwrite previous results in S3.
 		//
-		// Various logging setups.
+		// Logging
+		// -------
 		var (
 			logLevel = slog.LevelInfo
 			h        slog.Handler
@@ -103,7 +105,8 @@ func main() {
 		}
 		logger := slog.New(h)
 		slog.SetDefault(logger)
-		// Setup external services and data stores.
+		// Setup external services and data stores
+		// ---------------------------------------
 		grobid := grobidclient.New(*grobidHost)
 		slog.Info("grobid client", "host", *grobidHost)
 		s3opts := &blobproc.WrapS3Options{
@@ -118,11 +121,15 @@ func main() {
 			log.Fatalf("cannot access S3: %v", err)
 		}
 		slog.Info("s3 wrapper", "endpoint", *s3Endpoint)
+		// Spool walk
+		// ----------
+		//
 		// Walk the spool directory and process one file after another. Run
 		// local tools and send PDF to grobid, persist all results into S3.
 		//
 		// Partial success is accepted. However, the original PDF file will be
-		// removed from the spool folder. To reprocess, add the PDF to the spool folder again.
+		// removed from the spool folder by default. To reprocess, add the PDF
+		// to the spool folder again.
 		started := time.Now()
 		var stats struct {
 			NumFiles   int // Total number of files seen in one pass.
@@ -158,7 +165,8 @@ func main() {
 			}()
 			ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 			defer cancel()
-			// Fulltext and thumbail via local command line tools.
+			// Fulltext and thumbail via local command line tools
+			// --------------------------------------------------
 			result := pdfextract.ProcessFile(ctx, path, &pdfextract.Options{
 				Dim:       pdfextract.Dim{180, 300},
 				ThumbType: "JPEG",
@@ -208,7 +216,8 @@ func main() {
 				slog.Warn("skipping too large file", "path", path, "size", info.Size())
 				return nil
 			}
-			// Structured metadata from PDF via grobid.
+			// Structured metadata from PDF via grobid
+			// ---------------------------------------
 			gres, err := grobid.ProcessPDFContext(ctx, path, "processFulltextDocument", &grobidclient.Options{
 				GenerateIDs:            true,
 				ConsolidateHeader:      true,
