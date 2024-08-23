@@ -115,7 +115,7 @@ func main() {
 			slog.Error("cannot access S3", "err", err)
 			log.Fatalf("cannot access S3: %v", err)
 		}
-		slog.Info("s3 wrapper", "endendpointt", *s3Endpoint)
+		slog.Info("s3 wrapper", "endpointt", *s3Endpoint)
 		// Walk the spool directory and process one file after another. Run
 		// local tools and send PDF to grobid, persist all results into S3.
 		//
@@ -241,6 +241,6 @@ func main() {
 			slog.Error("walk failed", "err", err)
 			os.Exit(1)
 		}
-		slog.Info("directory walk done", "t", time.Since(started), "total", stats.NumFiles, "ok", stats.NumOK, "skipped", stats.NumSkipped)
+		slog.Info("directory walk done", "t", time.Since(started), "ts", time.Since(started).String(), "total", stats.NumFiles, "ok", stats.NumOK, "skipped", stats.NumSkipped)
 	}
 }
