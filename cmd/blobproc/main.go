@@ -20,7 +20,7 @@ import (
 	"github.com/miku/grobidclient"
 )
 
-var docs = `blobproc - process and persist PDF documents
+var docs = `blobproc - process and persist PDF documents derivations
 
 Emit JSON with locally extracted data:
 
@@ -38,8 +38,8 @@ var (
 	timeout           = flag.Duration("T", 300*time.Second, "subprocess timeout")
 	keepSpool         = flag.Bool("k", false, "keep files in spool after processing, mainly for debugging")
 	showVersion       = flag.Bool("version", false, "show version")
-	grobidHost        = flag.String("grobid", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
-	grobidMaxFileSize = flag.Int64("max-grobid-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
+	grobidHost        = flag.String("grobid-host", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
+	grobidMaxFileSize = flag.Int64("grobid-max-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
 	s3Endpoint        = flag.String("s3-endpoint", "localhost:9000", "S3 endpoint")
 	s3AccessKey       = flag.String("s3-access-key", "minioadmin", "S3 access key")
 	s3SecretKey       = flag.String("s3-secret-key", "minioadmin", "S3 secret key")
