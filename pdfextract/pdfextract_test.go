@@ -173,14 +173,16 @@ func TestPdfExtract(t *testing.T) {
 			v.Metadata.PDFCPU.Infos[0].Source = ""
 		}
 		// Remaining fields should be fixed now.
-		if !cmp.Equal(result, &want) {
+		if !cmp.Equal(result, &want, cmpopts.EquateEmpty()) {
 			// If we fail, we write the result JSON to a tempfile for later
 			// inspection or snapshot creation.
+			t.Logf("file: %v, snapshot: %v", c.filename, c.snapshot)
 			t.Fatalf("diff: %v", cmp.Diff(result, &want, cmpopts.EquateEmpty()))
 		}
 		// Check link extraction.
-		if !cmp.Equal(result.Weblinks, c.links) {
-			t.Fatalf("diff: %v", cmp.Diff(result.Weblinks, c.links))
+		if !cmp.Equal(result.Weblinks, c.links, cmpopts.EquateEmpty()) {
+			t.Logf("file: %v, snapshot: %v", c.filename, c.snapshot)
+			t.Fatalf("diff: %v", cmp.Diff(result.Weblinks, c.links, cmpopts.EquateEmpty()))
 		}
 	}
 }
