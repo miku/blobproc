@@ -27,6 +27,68 @@ deployment via an OS distribution package.
 * receive blob over HTTP, may be heritrix, curl, some backfill process
 * regularly scan spool dir and process found files
 
+## Usage
+
+Server component.
+
+```
+$ blobprocd -h
+Usage of blobprocd:
+  -T duration
+        server timeout (default 15s)
+  -access-log string
+        server access logfile, none if empty
+  -addr string
+        host port to listen on (default "0.0.0.0:8000")
+  -debug
+        switch to log level DEBUG
+  -log string
+        structured log output file, stderr if empty
+  -spool string
+         (default "/home/tir/.local/share/blobproc/spool")
+  -version
+        show version
+```
+
+Processing command line tool.
+
+```
+$ blobproc -h
+blobproc - process and persist PDF documents derivations
+
+Emit JSON with locally extracted data:
+
+  $ blobproc -f file.pdf | jq .
+
+Flags
+
+  -T duration
+        subprocess timeout (default 5m0s)
+  -debug
+        more verbose output
+  -f string
+        process a single file (local tools only), for testing
+  -grobid-host string
+        grobid host, cf. https://is.gd/3wnssq (default "http://localhost:8070")
+  -grobid-max-filesize int
+        max file size to send to grobid in bytes (default 268435456)
+  -k    keep files in spool after processing, mainly for debugging
+  -logfile string
+        structured log output file, stderr if empty
+  -pidfile string
+        pidfile (default "/run/user/1000/blobproc.pid")
+  -s3-access-key string
+        S3 access key (default "minioadmin")
+  -s3-endpoint string
+        S3 endpoint (default "localhost:9000")
+  -s3-secret-key string
+        S3 secret key (default "minioadmin")
+  -spool string
+         (default "/home/tir/.local/share/blobproc/spool")
+  -version
+        show version
+```
+
 ## Scaling
 
 * TODO: tasks will run in parallel, e.g. text, thumbnail generation and grobid all run in parallel, but we process one file by one for now
