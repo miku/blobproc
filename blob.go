@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
 	"github.com/minio/minio-go/v7"
@@ -40,12 +41,21 @@ type WrapS3Options struct {
 func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 	client, err := minio.New(endpoint,
 		&minio.Options{
-			Creds:  credentials.NewStaticV4(opts.AccessKey, opts.SecretKey, ""),
+			// Note seaweedfs may not work with V4!
+			Creds:  credentials.NewStaticV2(opts.AccessKey, opts.SecretKey, ""),
 			Secure: opts.UseSSL,
 		},
 	)
 	if err != nil {
 		return nil, err
+	}
+	buckets, err := client.ListBuckets(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("could not list S3 buckets: %w", err)
+	}
+	slog.Info("S3 client ok", "n", len(buckets))
+	for _, bucket := range buckets {
+		slog.Debug("found bucket", "bucket", bucket.Name)
 	}
 	return &WrapS3{
 		Client: client,
@@ -111,11 +121,13 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 	}
 	ok, err := wrap.Client.BucketExists(context.Background(), req.Bucket)
 	if err != nil {
+		slog.Error("bucket exist failed", "err", err)
 		return nil, err
 	}
 	if !ok {
 		opts := minio.MakeBucketOptions{}
 		if err := wrap.Client.MakeBucket(ctx, req.Bucket, opts); err != nil {
+			slog.Error("make bucket failed", "err", err)
 			return nil, err
 		}
 	}
@@ -138,6 +150,7 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 	info, err := wrap.Client.PutObject(ctx, req.Bucket, objPath,
 		bytes.NewReader(req.Blob), int64(len(req.Blob)), opts)
 	if err != nil {
+		slog.Error("put object failed", "err", err)
 		return nil, err
 	}
 	if info.Bucket != req.Bucket {

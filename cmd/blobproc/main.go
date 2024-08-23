@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/adrg/xdg"
@@ -105,17 +106,18 @@ func main() {
 		// Setup external services and data stores.
 		grobid := grobidclient.New(*grobidHost)
 		slog.Info("grobid client", "host", *grobidHost)
-		wrapS3, err := blobproc.NewWrapS3(*s3Endpoint, &blobproc.WrapS3Options{
-			AccessKey:     *s3AccessKey,
-			SecretKey:     *s3SecretKey,
+		s3opts := &blobproc.WrapS3Options{
+			AccessKey:     strings.TrimSpace(*s3AccessKey),
+			SecretKey:     strings.TrimSpace(*s3SecretKey),
 			DefaultBucket: "sandcrawler",
 			UseSSL:        false,
-		})
+		}
+		wrapS3, err := blobproc.NewWrapS3(*s3Endpoint, s3opts)
 		if err != nil {
 			slog.Error("cannot access S3", "err", err)
 			log.Fatalf("cannot access S3: %v", err)
 		}
-		slog.Info("s3 wrapper", "endpointt", *s3Endpoint)
+		slog.Info("s3 wrapper", "endpoint", *s3Endpoint)
 		// Walk the spool directory and process one file after another. Run
 		// local tools and send PDF to grobid, persist all results into S3.
 		//
