@@ -25,7 +25,7 @@ import (
 
 var ErrNoData = errors.New("no data")
 
-// FileInfo groups checksum and size for a file. The checksums are all
+// FileInfo groups checksum and size for a file. The checksums should all be
 // lowercase hex digests.
 type FileInfo struct {
 	Size      int64  `json:"size"`
@@ -145,23 +145,26 @@ func extractThumbnailFromPDF(ctx context.Context, filename string, dim Dim, thum
 		return nil, fmt.Errorf("missing pdftoppm executable")
 	}
 	var (
-		prefix = filename + ".page0.wip"
-		dst    = prefix + ".jpg" // automatically assigned by pdftoppm
+		prefix          = filename + ".page0.wip"
+		formatFlag, dst string
 	)
-	defer func() {
-		_ = os.Remove(dst)
-	}()
-	var formatFlag string
 	switch thumbType {
 	case "jpg", "jpeg", "JPEG":
 		formatFlag = "-jpeg"
+		dst = prefix + ".jpg"
 	case "png", "PNG":
 		formatFlag = "-png"
+		dst = prefix + ".png"
 	case "tiff", "TIFF":
 		formatFlag = "-tiff"
+		dst = prefix + ".tiff"
 	default:
 		formatFlag = "-jpeg"
+		dst = prefix + ".jpg"
 	}
+	defer func() {
+		_ = os.Remove(dst)
+	}()
 	cmd := exec.CommandContext(ctx, "pdftoppm",
 		formatFlag,
 		"-f", "1",
