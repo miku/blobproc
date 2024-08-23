@@ -146,8 +146,11 @@ func main() {
 			slog.Debug("processing", "path", path)
 			defer func() {
 				if !*keepSpool {
-					if err := os.Remove(path); err != nil {
-						slog.Warn("error removing file from spool", "err", err, "path", path)
+					if _, err := os.Stat(path); err == nil {
+						// Only try to remove file, if it exists.
+						if err := os.Remove(path); err != nil {
+							slog.Warn("error removing file from spool", "err", err, "path", path)
+						}
 					}
 				} else {
 					slog.Debug("keeping file in spool", "path", path)
