@@ -87,6 +87,13 @@ Flags
         show version
 ```
 
+## Performance data points
+
+The initial, unoptimized version would process about 25 PDF docs/minute or 36K
+pdfs/day. We were able to crawl much faster than that, e.g. we reached 63G
+captured data (not all pdf) after about 4 hours. GROBID should be able to
+handle up to 10 docs/s.
+
 ## Scaling
 
 * TODO: tasks will run in parallel, e.g. text, thumbnail generation and grobid all run in parallel, but we process one file by one for now
