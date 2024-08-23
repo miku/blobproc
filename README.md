@@ -4,8 +4,8 @@ status: testing
 
 BLOBPROC is a *shrink wrap* version of PDF blob postprocessing found in
 sandcrawler. Specifically it is designed to process and persist documents
-*without any additional component*, like a database or a separate queue and do
-this in a performant, reliant, boring and observable way.
+*without any extra component*, like a database or a separate queuing system and
+do this in a performant, reliant, boring and observable way.
 
 BLOBPROC contains two components:
 
@@ -22,8 +22,6 @@ In our case blobproc will execute the following tasks:
 More tasks can be added by extending blobproc itself. A focus remains on simple
 deployment via an OS distribution package.
 
-![](static/00596.png)
-
 ## Mode of operation
 
 * receive blob over HTTP, may be heritrix, curl, some backfill process
@@ -31,8 +29,8 @@ deployment via an OS distribution package.
 
 ## Scaling
 
-* tasks will run in parallel, e.g. text, thumbnail generation and grobid all run in parallel, but we process one file by one for now
-* we should be able to configure a pool of grobid hosts to send requests to
+* TODO: tasks will run in parallel, e.g. text, thumbnail generation and grobid all run in parallel, but we process one file by one for now
+* TODO: we should be able to configure a pool of grobid hosts to send requests to
 
 ## Backfill
 
@@ -64,8 +62,4 @@ real    11m0.767s
 user    73m57.763s
 sys     5m55.393s
 ```
-
-----
-
-Image credit: [SD](https://github.com/CompVis/stable-diffusion)
 
