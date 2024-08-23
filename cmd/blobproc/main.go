@@ -178,7 +178,7 @@ func main() {
 					}
 					resp, err := wrapS3.PutBlob(ctx, &opts)
 					if err != nil {
-						slog.Error("s3 failed (thumbnail)", "err", err)
+						slog.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
 					} else {
 						slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 					}
@@ -195,7 +195,7 @@ func main() {
 					}
 					resp, err := wrapS3.PutBlob(ctx, &opts)
 					if err != nil {
-						slog.Error("s3 failed (text)", "err", err)
+						slog.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
 					} else {
 						slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 					}
@@ -237,12 +237,18 @@ func main() {
 				}
 			}
 			stats.NumOK++
+			slog.Debug("processing finished successfully", "path", path)
 			return nil
 		})
 		if err != nil {
 			slog.Error("walk failed", "err", err)
 			os.Exit(1)
 		}
-		slog.Info("directory walk done", "t", time.Since(started), "ts", time.Since(started).String(), "total", stats.NumFiles, "ok", stats.NumOK, "skipped", stats.NumSkipped)
+		slog.Info("directory walk done",
+			"t", time.Since(started),
+			"ts", time.Since(started).String(),
+			"total", stats.NumFiles,
+			"ok", stats.NumOK,
+			"skipped", stats.NumSkipped)
 	}
 }
