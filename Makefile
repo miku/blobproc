@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-TARGETS := blobprocd blobproc # blobproc, TODO: add this
+TARGETS := blobprocd blobproc
 PKGNAME := blobproc
 MAKEFLAGS := --jobs=$(shell nproc)
 
