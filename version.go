@@ -1,4 +1,4 @@
 package blobproc
 
 // Version of library and cli tools.
-var Version = "0.3.7"
+var Version = "0.3.8"
