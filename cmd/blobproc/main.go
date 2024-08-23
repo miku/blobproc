@@ -127,14 +127,23 @@ func main() {
 		//
 		// Partial success is accepted. However, the original PDF file will be
 		// removed from the spool folder. To reprocess, add the PDF to the spool folder again.
+		started := time.Now()
+		var stats struct {
+			NumFiles   int // Total number of files seen in one pass.
+			NumOK      int // All went fine.
+			NumSkipped int // Skipped for any reason.
+		}
 		err = filepath.Walk(*spoolDir, func(path string, info fs.FileInfo, err error) error {
+			stats.NumFiles++
 			if err != nil {
 				return err
 			}
 			if info.IsDir() {
+				stats.NumSkipped++
 				return nil
 			}
 			if info.Size() == 0 {
+				stats.NumSkipped++
 				slog.Warn("skipping empty file", "path", path)
 				return nil
 			}
@@ -231,11 +240,13 @@ func main() {
 					slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 				}
 			}
+			stats.NumOK++
 			return nil
 		})
 		if err != nil {
 			slog.Error("walk failed", "err", err)
 			os.Exit(1)
 		}
+		slog.Info("directory walk done", "t", time.Since(started), "total", stats.NumFiles, "ok", stats.NumOK, "skipped", stats.NumSkipped)
 	}
 }
