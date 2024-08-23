@@ -217,7 +217,14 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	slog.Debug("spooled file", "file", dst, "url", spoolURL, "t", time.Since(started))
+	// If we use heritrix, we can capture the originating URL and log it as
+	// well. TODO: get rid of this exception.
+	curi := r.Header.Get("X-Heritrix-CURI")
+	if curi != "" {
+		slog.Debug("spooled file", "file", dst, "url", spoolURL, "t", time.Since(started), "curi", curi)
+	} else {
+		slog.Debug("spooled file", "file", dst, "url", spoolURL, "t", time.Since(started))
+	}
 	w.Header().Add("Location", spoolURL)
 	w.WriteHeader(http.StatusAccepted)
 }
