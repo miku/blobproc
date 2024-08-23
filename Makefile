@@ -19,7 +19,7 @@ bench:
 
 .PHONY: cover
 cover:
-	# may take 1m46.456s or more
+	# may take 1m46.456s or longer
 	go test -v -coverprofile=coverage.out -cover ./...
 	go tool cover -html=coverage.out -o coverage.html
 	# open coverage.html
