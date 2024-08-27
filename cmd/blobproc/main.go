@@ -52,6 +52,40 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	// By default, try to work through the whole spool dir, file by file.
+	//
+	// This whole block of code does reading files from disk, processing them
+	// through various tools and services and persists the results in S3.
+	//
+	// The spool directory is the queue and it gets cleanup up, once the
+	// file has been processed, even if just partially.
+	//
+	// You should be able to just add files to the spool folder again to
+	// process them and to overwrite previous results in S3.
+	//
+	// Logging
+	// -------
+	var (
+		logLevel = slog.LevelInfo
+		h        slog.Handler
+	)
+	if *debug {
+		logLevel = slog.LevelDebug
+	}
+	switch {
+	case *logFile != "":
+		f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			slog.Error("cannot open log", "err", err)
+			os.Exit(1)
+		}
+		defer f.Close()
+		h = slog.NewJSONHandler(f, &slog.HandlerOptions{Level: logLevel})
+	default:
+		h = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+	}
+	logger := slog.New(h)
+	slog.SetDefault(logger)
 	switch {
 	case *showVersion:
 		fmt.Println(blobproc.Version)
@@ -104,40 +138,6 @@ func main() {
 			log.Fatal(err)
 		}
 	default:
-		// By default, try to work through the whole spool dir, file by file.
-		//
-		// This whole block of code does reading files from disk, processing them
-		// through various tools and services and persists the results in S3.
-		//
-		// The spool directory is the queue and it gets cleanup up, once the
-		// file has been processed, even if just partially.
-		//
-		// You should be able to just add files to the spool folder again to
-		// process them and to overwrite previous results in S3.
-		//
-		// Logging
-		// -------
-		var (
-			logLevel = slog.LevelInfo
-			h        slog.Handler
-		)
-		if *debug {
-			logLevel = slog.LevelDebug
-		}
-		switch {
-		case *logFile != "":
-			f, err := os.OpenFile(*logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if err != nil {
-				slog.Error("cannot open log", "err", err)
-				os.Exit(1)
-			}
-			defer f.Close()
-			h = slog.NewJSONHandler(f, &slog.HandlerOptions{Level: logLevel})
-		default:
-			h = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
-		}
-		logger := slog.New(h)
-		slog.SetDefault(logger)
 		// Setup external services and data stores
 		// ---------------------------------------
 		grobid := grobidclient.New(*grobidHost)
