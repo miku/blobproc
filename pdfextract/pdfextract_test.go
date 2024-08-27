@@ -12,6 +12,11 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
+// TestPdfExtract uses a snapshot style test. If the expected JSON files are
+// removed, the test will not fail, but will write out the current
+// serialization out. This is useful, if processing has changed significantly,
+// and it is easier to remove the previous snapshot and to generate a new one
+// instead.
 func TestPdfExtract(t *testing.T) {
 	var cases = []struct {
 		filename string

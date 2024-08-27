@@ -74,8 +74,8 @@ func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 // Default bucket is "sandcrawler-dev", other buckets via infra:
 //
 // - "sandcrawler" for sandcrawler_grobid_bucket
-// - "thumbnail" for sandcrawler_thumbnail_bucket
 // - "sandcrawler" for sandcrawler_text_bucket
+// - "thumbnail" for sandcrawler_thumbnail_bucket
 type BlobRequestOptions struct {
 	Folder  string
 	Blob    []byte
