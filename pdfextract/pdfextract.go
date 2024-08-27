@@ -274,7 +274,7 @@ func ProcessBlob(ctx context.Context, blob []byte, opts *Options) *Result {
 			Err:     fmt.Errorf("thumbnail extraction failed with: %w", err),
 		}
 	case len(page0Thumbail) < 50:
-		// assuming that very small images mean something went wrong
+		// "assuming that very small images mean something went wrong"
 		page0Thumbail = nil
 	}
 	// Extract additional pdf info.

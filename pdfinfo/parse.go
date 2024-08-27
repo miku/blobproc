@@ -18,6 +18,8 @@ type Metadata struct {
 	PDFInfo *Info   `json:"pdfinfo,omitempty"` // pdfinfo, parsed into JSON.
 }
 
+// LegacyPDFExtra returns a struct that looks like the pdfextra dict from the
+// sandcrawler. Here for compatibilty.
 func (metadata Metadata) LegacyPDFExtra() *PDFExtra {
 	return &PDFExtra{
 		Page0Height: metadata.PDFInfo.PageDim().Height,
@@ -43,7 +45,7 @@ type PDFExtra struct {
 }
 
 // PDFCPU structured output from pdfcpu tool. One annoyance of pdfcpu is that
-// it expect the file to have a .pdf extenstion (that's so weird!).
+// it expect the file to have a .pdf extenstion (that's sooo weird!).
 type PDFCPU struct {
 	Header struct {
 		Creation string `json:"creation,omitempty"`
@@ -152,7 +154,9 @@ func (info *Info) PageDim() Dim {
 	return dim
 }
 
-// ParseFile a filename into a structured metadata object. Requires pdfinfo and pdfcpu to be installed.
+// ParseFile a filename into a structured metadata object. Requires pdfinfo and
+// pdfcpu to be installed. The filename must have .pdf extension, otherwise
+// pdfcpu will fail.
 func ParseFile(ctx context.Context, filename string) (*Metadata, error) {
 	if _, err := exec.LookPath("pdfcpu"); err != nil {
 		return nil, fmt.Errorf("missing pdfcpu executable")
@@ -175,6 +179,7 @@ func ParseFile(ctx context.Context, filename string) (*Metadata, error) {
 }
 
 // ParseFile parses a pdf file. Requires pdfinfo executable to be installed.
+// The filename must have .pdf extension, otherwise pdfcpu will fail.
 func runPdfCpu(ctx context.Context, filename string) (*PDFCPU, error) {
 	var buf bytes.Buffer
 	cmd := exec.CommandContext(ctx, "pdfcpu", "info", "-j", filename)
