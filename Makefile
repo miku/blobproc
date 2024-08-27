@@ -2,6 +2,7 @@ SHELL := /bin/bash
 TARGETS := blobprocd blobproc
 PKGNAME := blobproc
 MAKEFLAGS := --jobs=$(shell nproc)
+VERSION := 0.3.16
 
 .PHONY: all
 all: $(TARGETS)
@@ -43,4 +44,9 @@ deb: $(TARGETS)
 	cd packaging/deb && fakeroot dpkg-deb --build $(PKGNAME) .
 	mv packaging/deb/$(PKGNAME)_*.deb .
 
+
+.PHONY: update-version
+update-version:
+	sed -i -e 's@^const Version =.*@const Version = "$(VERSION)"@' version.go
+	sed -i -e 's@^Version:.*@Version: $(VERSION)@' packaging/deb/blobproc/DEBIAN/control
 
