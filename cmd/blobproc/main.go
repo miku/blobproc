@@ -37,6 +37,8 @@ var (
 	timeout           = flag.Duration("T", 300*time.Second, "subprocess timeout")
 	keepSpool         = flag.Bool("k", false, "keep files in spool after processing, mainly for debugging")
 	showVersion       = flag.Bool("version", false, "show version")
+	walkFast          = flag.Bool("P", false, "run processing in parallel (exp)")
+	numWorkers        = flag.Int("w", 4, "number of parallel workers")
 	grobidHost        = flag.String("grobid-host", "http://localhost:8070", "grobid host, cf. https://is.gd/3wnssq") // TODO: add multiple servers
 	grobidMaxFileSize = flag.Int64("grobid-max-filesize", 256*1024*1024, "max file size to send to grobid in bytes")
 	s3Endpoint        = flag.String("s3-endpoint", "localhost:9000", "S3 endpoint")
@@ -68,6 +70,37 @@ func main() {
 			log.Fatalf("process failed with: %v", result.Status)
 		}
 		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+			log.Fatal(err)
+		}
+	case *walkFast:
+		// Setup external services and data stores
+		// ---------------------------------------
+		grobid := grobidclient.New(*grobidHost)
+		slog.Info("grobid client", "host", *grobidHost)
+		s3opts := &blobproc.WrapS3Options{
+			AccessKey:     strings.TrimSpace(*s3AccessKey),
+			SecretKey:     strings.TrimSpace(*s3SecretKey),
+			DefaultBucket: "sandcrawler",
+			UseSSL:        false,
+		}
+		wrapS3, err := blobproc.NewWrapS3(*s3Endpoint, s3opts)
+		if err != nil {
+			slog.Error("cannot access S3", "err", err)
+			log.Fatalf("cannot access S3: %v", err)
+		}
+		slog.Info("s3 wrapper", "endpoint", *s3Endpoint)
+		// Setup parallel walker
+		// ---------------------
+		walker := blobproc.Walker{
+			Dir:               *spoolDir,
+			NumWorkers:        *numWorkers,
+			KeepSpool:         *keepSpool,
+			GrobidMaxFileSize: *grobidMaxFileSize,
+			Timeout:           *timeout,
+			Grobid:            grobid,
+			S3:                wrapS3,
+		}
+		if err := walker.Run(context.Background()); err != nil {
 			log.Fatal(err)
 		}
 	default:
