@@ -125,7 +125,7 @@ func main() {
 		slog.Info("s3 wrapper", "endpoint", *s3Endpoint)
 		// Setup parallel walker
 		// ---------------------
-		walker := blobproc.Walker{
+		walker := blobproc.WalkFast{
 			Dir:               *spoolDir,
 			NumWorkers:        *numWorkers,
 			KeepSpool:         *keepSpool,

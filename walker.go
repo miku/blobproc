@@ -26,13 +26,16 @@ func (ws *WalkStats) SuccessRatio() float64 {
 	return float64(ws.OK) / float64(ws.Processed)
 }
 
+// Payload is what we pass to workers. Since the worker needs file size
+// information, we pass it along, as the expensive stat has already been
+// performed.
 type Payload struct {
 	Path     string
 	FileInfo fs.FileInfo
 }
 
-// Walker is a walker that runs postprocessing in parallel.
-type Walker struct {
+// WalkFast is a walker that runs postprocessing in parallel.
+type WalkFast struct {
 	Dir               string
 	NumWorkers        int
 	KeepSpool         bool
@@ -46,7 +49,7 @@ type Walker struct {
 
 // worker can process path from a queue in a thread. If the worker context is
 // cancelled, it will wrap up the last processing step and then tear down.
-func (w *Walker) worker(wctx context.Context, workerName string, queue chan Payload, wg *sync.WaitGroup) {
+func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Payload, wg *sync.WaitGroup) {
 	defer wg.Done()
 	logger := slog.With(
 		slog.String("worker", workerName),
@@ -167,8 +170,15 @@ func (w *Walker) worker(wctx context.Context, workerName string, queue chan Payl
 	logger.Debug("worker shutdown ok")
 }
 
-// Run start processing files.
-func (w *Walker) Run(ctx context.Context) error {
+// Run start processing files. Do some basic sanity check before setting up
+// workers as we do not have a constructor function.
+func (w *WalkFast) Run(ctx context.Context) error {
+	if w.Grobid == nil {
+		return fmt.Errorf("walker needs grobid setup")
+	}
+	if w.S3 == nil {
+		return fmt.Errorf("walker needs S3")
+	}
 	w.stats = new(WalkStats)
 	var queue = make(chan Payload)
 	var wg sync.WaitGroup
