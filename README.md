@@ -4,10 +4,10 @@
 
 ![](static/00741.png)
 
-BLOBPROC is a *shrink wrap* version of PDF postprocessing found in sandcrawler
-([ias](https://scholar.archive.org) infra). Specifically it is designed to
-process and persist documents with minimum number of external components and
-little to no state.
+BLOBPROC is a *shrink wrap* version of PDF postprocessing found in sandcrawler,
+which is part of [IA Scholar](https://scholar.archive.org) infra. Specifically
+it is designed to process and persist documents with minimum number of external
+components and little to no state.
 
 BLOBPROC currently ships with two cli tools:
 
