@@ -22,7 +22,10 @@ In our case blobproc will execute the following tasks:
 * find all weblinks in the PDF text and send them to a crawl API (wip)
 
 More tasks can be added by extending blobproc itself. A focus remains on simple
-deployment via an OS distribution package.
+deployment via an OS distribution package. By push various parts into library
+functions, the main processing code reduces to about [100 lines of
+code](https://github.com/miku/blobproc/blob/06af4c57aa7c3782b3c2704dc962d20746f2160a/walker.go#L64-L170)
+(as of 08/2024).
 
 ## Mode of operation
 

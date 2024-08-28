@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/miku/blobproc/pdfextract"
@@ -16,8 +17,8 @@ import (
 
 // WalkStats are a poor mans metrics.
 type WalkStats struct {
-	Processed int
-	OK        int
+	Processed int64
+	OK        int64
 }
 
 // SuccessRatio calculates the ration of successful to total processed files.
@@ -45,7 +46,6 @@ type WalkFast struct {
 	Timeout           time.Duration
 	Grobid            *grobidclient.Grobid
 	S3                *WrapS3
-	mu                sync.Mutex
 	stats             *WalkStats
 }
 
@@ -65,9 +65,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 				path := payload.Path
 				logger.Debug("processing", "path", path)
 				started := time.Now()
-				w.mu.Lock()
-				w.stats.Processed++
-				w.mu.Unlock()
+				atomic.AddInt64(&w.stats.Processed, 1)
 				defer func() {
 					if !w.KeepSpool {
 						if _, err := os.Stat(path); err == nil {
@@ -163,9 +161,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 					}
 				}
 				logger.Debug("processing finished successfully", "path", path, "t", time.Since(started), "ts", time.Since(started).Seconds())
-				w.mu.Lock()
-				w.stats.OK++
-				w.mu.Unlock()
+				atomic.AddInt64(&w.stats.OK, 1)
 			}
 			wrapper() // for defer
 		}
