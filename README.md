@@ -1,6 +1,6 @@
 # BLOBPROC
 
-> Queues like its 1995!
+> Queues like it's 1995!
 
 ![](static/00741.png)
 
