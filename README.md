@@ -25,7 +25,17 @@ More tasks can be added by extending blobproc itself. A focus remains on simple
 deployment via an OS distribution package. By push various parts into library
 functions, the main processing code reduces to about [100 lines of
 code](https://github.com/miku/blobproc/blob/37f9cd7873f1e08400f46e98640e2b24bd37a088/walker.go#L64-L166)
-(as of 08/2024).
+(as of 08/2024). Currently both blobproc and blobprocd run on a dual-core [2nd
+gen
+XEON](https://ark.intel.com/content/www/us/en/ark/products/193394/intel-xeon-silver-4216-processor-22m-cache-2-10-ghz.html);
+blobprocd received up to 100 rps and wrote pdfs to rotational
+disk.
+
+## Bulk, back-of-the-envelope, reprocessing
+
+Currently, about 5 pdfs/s. GROBID may be able to handle up to 10 pdfs/s. To
+reprocess, say 200M pdfs in less than a month, we would need about 10 GROBID
+instances.
 
 ## Mode of operation
 
