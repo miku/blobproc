@@ -62,9 +62,12 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 			break
 		default:
 			wrapper := func() {
-				path := payload.Path
+				var (
+					path    = payload.Path
+					started = time.Now()
+					errors  []error
+				)
 				logger.Debug("processing", "path", path)
-				started := time.Now()
 				atomic.AddInt64(&w.stats.Processed, 1)
 				defer func() {
 					if !w.KeepSpool {
@@ -88,8 +91,10 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 				switch {
 				case result.Status != "success":
 					logger.Warn("pdfextract failed", "status", result.Status, "err", result.Err)
+					errors = append(errors, result.Err)
 				case len(result.SHA1Hex) != 40:
 					logger.Warn("invalid sha1 in response", "sha1", result.SHA1Hex)
+					errors = append(errors, fmt.Errorf("invalid SHA1 in response: %v", result.SHA1Hex))
 				case result.Status == "success":
 					// If we have a thumbnail, save it.
 					if result.HasPage0Thumbnail() {
@@ -104,6 +109,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 						resp, err := w.S3.PutBlob(ctx, &opts)
 						if err != nil {
 							logger.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
+							errors = append(errors, fmt.Errorf("s3 failed (thumbnail): %v", result.SHA1Hex))
 						} else {
 							logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 						}
@@ -121,6 +127,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 						resp, err := w.S3.PutBlob(ctx, &opts)
 						if err != nil {
 							logger.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
+							errors = append(errors, fmt.Errorf("s3 failed (text): %v", result.SHA1Hex))
 						} else {
 							logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 						}
@@ -144,6 +151,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 				switch {
 				case err != nil || gres.Err != nil:
 					logger.Warn("grobid failed", "err", err)
+					return
 				default:
 					opts := BlobRequestOptions{
 						Bucket:  "sandcrawler",
@@ -155,13 +163,23 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 					}
 					resp, err := w.S3.PutBlob(ctx, &opts)
 					if err != nil {
-						logger.Error("s3 failed (text)", "err", err)
+						logger.Error("s3 failed (tei)", "err", err)
+						errors = append(errors, fmt.Errorf("s3 failed (tei): %v", err))
 					} else {
 						logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 					}
 				}
-				logger.Debug("processing finished successfully", "path", path, "t", time.Since(started), "ts", time.Since(started).Seconds())
-				atomic.AddInt64(&w.stats.OK, 1)
+				if len(errors) == 0 {
+					logger.Debug("processing finished successfully", "path", path, "t", time.Since(started), "ts", time.Since(started).Seconds())
+					atomic.AddInt64(&w.stats.OK, 1)
+				} else {
+					logger.Warn("processing finished with some errors",
+						"path", path,
+						"num_errors", len(errors),
+						"t", time.Since(started),
+						"ts", time.Since(started).Seconds(),
+					)
+				}
 			}
 			wrapper() // for defer
 		}
