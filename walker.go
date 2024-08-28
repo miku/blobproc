@@ -14,11 +14,13 @@ import (
 	"github.com/miku/grobidclient"
 )
 
+// WalkStats are a poor mans metrics.
 type WalkStats struct {
 	Processed int
 	OK        int
 }
 
+// SuccessRatio calculates the ration of successful to total processed files.
 func (ws *WalkStats) SuccessRatio() float64 {
 	if ws.Processed == 0 {
 		return 1.0
@@ -62,6 +64,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 			wrapper := func() {
 				path := payload.Path
 				logger.Debug("processing", "path", path)
+				started := time.Now()
 				w.mu.Lock()
 				w.stats.Processed++
 				w.mu.Unlock()
@@ -159,7 +162,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 						logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 					}
 				}
-				logger.Debug("processing finished successfully", "path", path)
+				logger.Debug("processing finished successfully", "path", path, "t", time.Since(started), "ts", time.Since(started).Seconds)
 				w.mu.Lock()
 				w.stats.OK++
 				w.mu.Unlock()
