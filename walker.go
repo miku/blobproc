@@ -56,109 +56,112 @@ func (w *Walker) worker(wctx context.Context, workerName string, queue chan Payl
 		case <-wctx.Done():
 			break
 		default:
-			path := payload.Path
-			logger.Debug("processing", "path", path)
-			w.mu.Lock()
-			w.stats.Processed++
-			w.mu.Unlock()
-			defer func() {
-				if !w.KeepSpool {
-					if _, err := os.Stat(path); err == nil {
-						if err := os.Remove(path); err != nil {
-							logger.Warn("error removing file from spool", "err", err, "path", path)
+			wrapper := func() {
+				path := payload.Path
+				logger.Debug("processing", "path", path)
+				w.mu.Lock()
+				w.stats.Processed++
+				w.mu.Unlock()
+				defer func() {
+					if !w.KeepSpool {
+						if _, err := os.Stat(path); err == nil {
+							if err := os.Remove(path); err != nil {
+								logger.Warn("error removing file from spool", "err", err, "path", path)
+							}
+						}
+					} else {
+						logger.Debug("keeping file in spool", "path", path)
+					}
+				}()
+				ctx, cancel := context.WithTimeout(context.Background(), w.Timeout)
+				defer cancel()
+				// Fulltext and thumbail via local command line tools
+				// --------------------------------------------------
+				result := pdfextract.ProcessFile(ctx, path, &pdfextract.Options{
+					Dim:       pdfextract.Dim{180, 300},
+					ThumbType: "JPEG",
+				})
+				switch {
+				case result.Status != "success":
+					logger.Warn("pdfextract failed", "status", result.Status, "err", result.Err)
+				case len(result.SHA1Hex) != 40:
+					logger.Warn("invalid sha1 in response", "sha1", result.SHA1Hex)
+				case result.Status == "success":
+					// If we have a thumbnail, save it.
+					if result.HasPage0Thumbnail() {
+						opts := BlobRequestOptions{
+							Bucket:  "thumbnail",
+							Folder:  "pdf",
+							Blob:    result.Page0Thumbnail,
+							SHA1Hex: result.SHA1Hex,
+							Ext:     "180px.jpg",
+							Prefix:  "",
+						}
+						resp, err := w.S3.PutBlob(ctx, &opts)
+						if err != nil {
+							logger.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
+						} else {
+							logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 						}
 					}
-				} else {
-					logger.Debug("keeping file in spool", "path", path)
-				}
-			}()
-			ctx, cancel := context.WithTimeout(context.Background(), w.Timeout)
-			defer cancel()
-			// Fulltext and thumbail via local command line tools
-			// --------------------------------------------------
-			result := pdfextract.ProcessFile(ctx, path, &pdfextract.Options{
-				Dim:       pdfextract.Dim{180, 300},
-				ThumbType: "JPEG",
-			})
-			switch {
-			case result.Status != "success":
-				logger.Warn("pdfextract failed", "status", result.Status, "err", result.Err)
-			case len(result.SHA1Hex) != 40:
-				logger.Warn("invalid sha1 in response", "sha1", result.SHA1Hex)
-			case result.Status == "success":
-				// If we have a thumbnail, save it.
-				if result.HasPage0Thumbnail() {
-					opts := BlobRequestOptions{
-						Bucket:  "thumbnail",
-						Folder:  "pdf",
-						Blob:    result.Page0Thumbnail,
-						SHA1Hex: result.SHA1Hex,
-						Ext:     "180px.jpg",
-						Prefix:  "",
-					}
-					resp, err := w.S3.PutBlob(ctx, &opts)
-					if err != nil {
-						logger.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
-					} else {
-						logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+					// If we have some text, save it.
+					if len(result.Text) > 0 {
+						opts := BlobRequestOptions{
+							Bucket:  "sandcrawler",
+							Folder:  "text",
+							Blob:    []byte(result.Text),
+							SHA1Hex: result.SHA1Hex,
+							Ext:     "txt",
+							Prefix:  "",
+						}
+						resp, err := w.S3.PutBlob(ctx, &opts)
+						if err != nil {
+							logger.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
+						} else {
+							logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+						}
 					}
 				}
-				// If we have some text, save it.
-				if len(result.Text) > 0 {
+				if payload.FileInfo.Size() > w.GrobidMaxFileSize {
+					logger.Warn("skipping too large file", "path", path, "size", payload.FileInfo.Size())
+					return
+				}
+				// Structured metadata from PDF via grobid
+				// ---------------------------------------
+				gres, err := w.Grobid.ProcessPDFContext(ctx, path, "processFulltextDocument", &grobidclient.Options{
+					GenerateIDs:            true,
+					ConsolidateHeader:      true,
+					ConsolidateCitations:   false, // "too expensive for now"
+					IncludeRawCitations:    true,
+					IncluseRawAffiliations: true,
+					TEICoordinates:         []string{"ref", "figure", "persName", "formula", "biblStruct"},
+					SegmentSentences:       true,
+				})
+				switch {
+				case err != nil || gres.Err != nil:
+					logger.Warn("grobid failed", "err", err)
+				default:
 					opts := BlobRequestOptions{
 						Bucket:  "sandcrawler",
-						Folder:  "text",
-						Blob:    []byte(result.Text),
-						SHA1Hex: result.SHA1Hex,
-						Ext:     "txt",
+						Folder:  "grobid",
+						Blob:    gres.Body,
+						SHA1Hex: gres.SHA1Hex,
+						Ext:     "tei.xml",
 						Prefix:  "",
 					}
 					resp, err := w.S3.PutBlob(ctx, &opts)
 					if err != nil {
-						logger.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
+						logger.Error("s3 failed (text)", "err", err)
 					} else {
 						logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 					}
 				}
+				logger.Debug("processing finished successfully", "path", path)
+				w.mu.Lock()
+				w.stats.OK++
+				w.mu.Unlock()
 			}
-			if payload.FileInfo.Size() > w.GrobidMaxFileSize {
-				logger.Warn("skipping too large file", "path", path, "size", payload.FileInfo.Size())
-				continue
-			}
-			// Structured metadata from PDF via grobid
-			// ---------------------------------------
-			gres, err := w.Grobid.ProcessPDFContext(ctx, path, "processFulltextDocument", &grobidclient.Options{
-				GenerateIDs:            true,
-				ConsolidateHeader:      true,
-				ConsolidateCitations:   false, // "too expensive for now"
-				IncludeRawCitations:    true,
-				IncluseRawAffiliations: true,
-				TEICoordinates:         []string{"ref", "figure", "persName", "formula", "biblStruct"},
-				SegmentSentences:       true,
-			})
-			switch {
-			case err != nil || gres.Err != nil:
-				logger.Warn("grobid failed", "err", err)
-			default:
-				opts := BlobRequestOptions{
-					Bucket:  "sandcrawler",
-					Folder:  "grobid",
-					Blob:    gres.Body,
-					SHA1Hex: gres.SHA1Hex,
-					Ext:     "tei.xml",
-					Prefix:  "",
-				}
-				resp, err := w.S3.PutBlob(ctx, &opts)
-				if err != nil {
-					logger.Error("s3 failed (text)", "err", err)
-				} else {
-					logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
-				}
-			}
-			logger.Debug("processing finished successfully", "path", path)
-			w.mu.Lock()
-			w.stats.OK++
-			w.mu.Unlock()
+			wrapper() // for defer
 		}
 	}
 	logger.Debug("worker shutdown ok")
@@ -185,6 +188,7 @@ func (w *Walker) Run(ctx context.Context) error {
 			slog.Warn("skipping empty file", "path", path)
 			return nil
 		}
+		slog.Debug("walk status", "total", w.stats.Processed, "success", w.stats.SuccessRatio())
 		select {
 		case queue <- Payload{Path: path, FileInfo: info}:
 		case <-ctx.Done():

@@ -2,7 +2,7 @@ SHELL := /bin/bash
 TARGETS := blobprocd blobproc
 PKGNAME := blobproc
 MAKEFLAGS := --jobs=$(shell nproc)
-VERSION := 0.3.16
+VERSION := 0.3.17
 
 .PHONY: all
 all: $(TARGETS)
