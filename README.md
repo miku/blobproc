@@ -1,6 +1,6 @@
 # BLOBPROC
 
-status: testing
+> Queues like its 1995!
 
 BLOBPROC is a *shrink wrap* version of PDF blob postprocessing found in
 sandcrawler. Specifically it is designed to process and persist documents

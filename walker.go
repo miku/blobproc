@@ -162,7 +162,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 						logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 					}
 				}
-				logger.Debug("processing finished successfully", "path", path, "t", time.Since(started), "ts", time.Since(started).Seconds)
+				logger.Debug("processing finished successfully", "path", path, "t", time.Since(started), "ts", time.Since(started).Seconds())
 				w.mu.Lock()
 				w.stats.OK++
 				w.mu.Unlock()
