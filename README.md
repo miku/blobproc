@@ -16,7 +16,7 @@ BLOBPROC currently ships with two cli tools:
 
 In our case blobproc will execute the following tasks:
 
-* send PDF to **GROBID** and store the result in **S3**
+* send PDF to **GROBID** and store the result in **S3**, using [grobidclient](https://github.com/miku/grobidclient) Go library
 * generate text from PDF via **pdftotext** and store the result in **S3**
 * generate a thumbnail from PDF via **pdftoppm** and store the result in **S3**
 * find all weblinks in the PDF text and send them to a crawl API (wip)
