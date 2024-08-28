@@ -1,4 +1,4 @@
 package blobproc
 
 // Version of library and cli tools.
-const Version = "0.3.20 "
+const Version = "0.3.21 "
