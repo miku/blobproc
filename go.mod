@@ -8,6 +8,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/miku/grobidclient v0.2.3
 	github.com/minio/minio-go/v7 v7.0.76
 	github.com/testcontainers/testcontainers-go v0.32.0

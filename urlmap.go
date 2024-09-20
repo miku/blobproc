@@ -23,8 +23,10 @@ func (u *URLMap) ensureDB() error {
 	if err != nil {
 		return err
 	}
-
+	u.db = db
+	return nil
 }
 
 func (u *URLMap) Insert(url, sha1 string) error {
+	return nil
 }
