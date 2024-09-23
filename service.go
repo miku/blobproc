@@ -27,6 +27,13 @@ var errShortName = errors.New("short name")
 type WebSpoolService struct {
 	Dir        string
 	ListenAddr string
+	// TODO: add a (optional) reference to a store for url content hashes; it
+	// would be good to keep it optional (so one may just copy files into the
+	// spool folder), and maybe to provide a simple interface that can be
+	// easily fulfilled by different backend; it would be good to keep it
+	// optional (so one may just copy files into the spool folder), and maybe
+	// to provide a simple interface that can be easily fulfilled by different
+	// backend.
 }
 
 // spoolListEntry collects basic information about a spooled file.
