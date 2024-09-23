@@ -9,10 +9,16 @@ sandcrawler, which is part of [IA Scholar](https://scholar.archive.org) infra.
 Specifically it is designed to process and persist documents with minimum
 number of external components and little to no state.
 
-BLOBPROC currently ships with two cli tools:
+BLOBPROC currently ships with two cli programs:
 
-* **blobprocd** exposes an *HTTP server* that can receive binary data and stores it in a [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
+* **blobprocd** exposes an HTTP server that can receive binary data and stores it in a [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
 * **blobproc** is a process that scans the spool folder and executes post processing tasks on each PDF, and removes the file from spool, if all processing succeeded
+
+In our case pdf data may come from:
+
+* Heritrix crawl, via a [ScriptedProcessor](https://github.com/miku/blobproc/blob/bf5b5a3f5f7e38f996ec4be9179855f4b059cfb7/extra/heritrix/fetch-processor-snippet.xml#L30-L137)
+* (wip) a WARC file
+* in general, by any process that can deposit a file in the spool folder
 
 In our case blobproc will execute the following tasks:
 
