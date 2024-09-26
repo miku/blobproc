@@ -8,10 +8,12 @@ import (
 
 // URLMap wraps an sqlite3 database for URL and SHA1 lookups.
 type URLMap struct {
-	Path string
+	Path string // location of the database
 	mu   sync.Mutex
 	db   *sqlx.DB
 }
+
+// TODO: init simple k-v schema w/ indices
 
 func (u *URLMap) ensureDB() error {
 	if u.db != nil {
@@ -28,5 +30,9 @@ func (u *URLMap) ensureDB() error {
 }
 
 func (u *URLMap) Insert(url, sha1 string) error {
+	if err := u.ensureDB(); err != nil {
+		return err
+	}
+	db.Exec(`insert into map (url, sha1) values (?, ?)`, url, sha1)
 	return nil
 }
