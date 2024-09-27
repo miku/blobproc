@@ -13,7 +13,7 @@ create table if not exists map (
 	sha1 text not null,
 	timestamp datetime default CURRENT_TIMESTAMP
 );
-create index index_url_sha1 on map(url, sha1);
+create index if not exists index_url_sha1 on map(url, sha1);
 `
 
 // URLMap wraps an sqlite3 database for URL and SHA1 lookups.
