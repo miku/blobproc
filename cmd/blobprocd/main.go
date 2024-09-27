@@ -27,7 +27,7 @@ var (
 	debug         = flag.Bool("debug", false, "switch to log level DEBUG")
 	accessLogFile = flag.String("access-log", "", "server access logfile, none if empty")
 	logFile       = flag.String("log", "", "structured log output file, stderr if empty")
-	urlmapFile    = flag.String("urlmap", "", "path to sqlite3 file that will record (url, sha1) pairs; if empty nothing is recorded")
+	urlMapFile    = flag.String("urlmap", "", "path to sqlite3 file that will record (url, sha1) pairs; if empty nothing is recorded")
 )
 
 func main() {
@@ -72,8 +72,12 @@ func main() {
 		Dir:        *spoolDir,
 		ListenAddr: *listenAddr,
 	}
-	if *urlmapFile != "" {
-		svc.URLMap = &blobproc.URLMap{Path: *urlmapFile}
+	if *urlMapFile != "" {
+		urlMap := blobproc.URLMap{Path: *urlMapFile}
+		if err := urlMap.EnsureDB(); err != nil {
+			log.Fatal(err)
+		}
+		svc.URLMap = &urlMap
 	}
 	r := mux.NewRouter()
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

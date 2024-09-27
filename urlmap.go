@@ -23,7 +23,8 @@ type URLMap struct {
 	db   *sqlx.DB
 }
 
-func (u *URLMap) ensureDB() error {
+// EnsureDB creates a new database with schema, if it is not already set up.
+func (u *URLMap) EnsureDB() error {
 	if u.db != nil {
 		return nil
 	}
@@ -41,10 +42,11 @@ func (u *URLMap) ensureDB() error {
 	return nil
 }
 
+// Insert inserts a new pair into the database. We lock at the application
+// level to avoid 'database is locked (5) (SQLITE_BUSY)'
 func (u *URLMap) Insert(url, sha1 string) error {
-	if err := u.ensureDB(); err != nil {
-		return err
-	}
+	u.mu.Lock()
 	_, err := u.db.Exec(`insert into map (url, sha1) values (?, ?)`, url, sha1)
+	u.mu.Unlock()
 	return err
 }
