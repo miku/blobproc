@@ -34,6 +34,7 @@ type WebSpoolService struct {
 	// optional (so one may just copy files into the spool folder), and maybe
 	// to provide a simple interface that can be easily fulfilled by different
 	// backend.
+	URLMap *URLMap
 }
 
 // spoolListEntry collects basic information about a spooled file.
@@ -229,6 +230,13 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	curi := r.Header.Get("X-Heritrix-CURI")
 	if curi != "" {
 		slog.Debug("spooled file", "file", dst, "url", spoolURL, "t", time.Since(started), "curi", curi)
+		// If we have a URLMap configured, try to record the url, sha1 pair.
+		if svc.URLMap != nil {
+			err := svc.URLMap.Insert(curi, digest)
+			if err != nil {
+				slog.Warn("could not update urlmap", "err", err, "url", curi, "sha1", digest)
+			}
+		}
 	} else {
 		slog.Debug("spooled file", "file", dst, "url", spoolURL, "t", time.Since(started))
 	}
