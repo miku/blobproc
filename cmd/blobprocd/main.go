@@ -19,15 +19,16 @@ import (
 )
 
 var (
-	spoolDir      = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
-	listenAddr    = flag.String("addr", "0.0.0.0:8000", "host port to listen on")
-	timeout       = flag.Duration("T", 15*time.Second, "server timeout")
-	banner        = `{"id": "blobprocd", "about": "Send your PDF payload to %s/spool - a 200 OK status only confirms receipt, not successful postprocessing, which may take more time. Check Location header for spool id."}`
-	showVersion   = flag.Bool("version", false, "show version")
-	debug         = flag.Bool("debug", false, "switch to log level DEBUG")
-	accessLogFile = flag.String("access-log", "", "server access logfile, none if empty")
-	logFile       = flag.String("log", "", "structured log output file, stderr if empty")
-	urlMapFile    = flag.String("urlmap", "", "path to sqlite3 file that will record (url, sha1) pairs; if empty nothing is recorded")
+	spoolDir         = flag.String("spool", path.Join(xdg.DataHome, "/blobproc/spool"), "")
+	listenAddr       = flag.String("addr", "0.0.0.0:8000", "host port to listen on")
+	timeout          = flag.Duration("T", 15*time.Second, "server timeout")
+	banner           = `{"id": "blobprocd", "about": "Send your PDF payload to %s/spool - a 200 OK status only confirms receipt, not successful postprocessing, which may take more time. Check Location header for spool id."}`
+	showVersion      = flag.Bool("version", false, "show version")
+	debug            = flag.Bool("debug", false, "switch to log level DEBUG")
+	accessLogFile    = flag.String("access-log", "", "server access logfile, none if empty")
+	logFile          = flag.String("log", "", "structured log output file, stderr if empty")
+	urlMapFile       = flag.String("urlmap", "", "path to sqlite3 file that will record (url, sha1) pairs; if empty nothing is recorded")
+	urlMapHttpHeader = flag.String("urlmap-header", "X-BLOBPROC-URL", "HTTP header to use as URL for the URL map db, if available")
 )
 
 func main() {
@@ -69,8 +70,9 @@ func main() {
 		accessLogWriter = io.Discard
 	}
 	svc := &blobproc.WebSpoolService{
-		Dir:        *spoolDir,
-		ListenAddr: *listenAddr,
+		Dir:              *spoolDir,
+		ListenAddr:       *listenAddr,
+		URLMapHttpHeader: *urlMapHttpHeader,
 	}
 	if *urlMapFile != "" {
 		urlMap := blobproc.URLMap{Path: *urlMapFile}

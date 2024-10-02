@@ -35,6 +35,8 @@ type WebSpoolService struct {
 	// to provide a simple interface that can be easily fulfilled by different
 	// backend.
 	URLMap *URLMap
+	// The HTTP header to look for a URL associated with a pdf blob payload.
+	URLMapHttpHeader string
 }
 
 // spoolListEntry collects basic information about a spooled file.
@@ -225,9 +227,12 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	// If we use heritrix, we can capture the originating URL and log it as
-	// well. TODO: get rid of this exception.
-	curi := r.Header.Get("X-Heritrix-CURI")
+	curi := r.Header.Get("X-BLOBPROC-URL")
+	if curi == "" {
+		// TODO: Heritrix is the only client that uses this header; move
+		// heritrix towards the new header.
+		curi = r.Header.Get("X-Heritrix-CURI")
+	}
 	if curi != "" {
 		slog.Debug("spooled file", "file", dst, "url", spoolURL, "t", time.Since(started), "curi", curi)
 		// If we have a URLMap configured, try to record the url, sha1 pair.
