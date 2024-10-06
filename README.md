@@ -17,25 +17,24 @@ BLOBPROC currently ships with two cli programs:
 In our case pdf data may come from:
 
 * Heritrix crawl, via a [ScriptedProcessor](https://github.com/miku/blobproc/blob/bf5b5a3f5f7e38f996ec4be9179855f4b059cfb7/extra/heritrix/fetch-processor-snippet.xml#L30-L137)
-* (wip) a WARC file
-* in general, by any process that can deposit a file in the spool folder
+* (wip) a WARC file, a crawl collection or similar
+* in general, by any process that can deposit a file in the spool folder or send an HTTP request to blobprocd
 
 In our case blobproc will execute the following tasks:
 
-* send PDF to **GROBID** and store the result in **S3**, using [grobidclient](https://github.com/miku/grobidclient) Go library
-* generate text from PDF via **pdftotext** and store the result in **S3**
-* generate a thumbnail from PDF via **pdftoppm** and store the result in **S3**
+* send PDF to [GROBID](https://github.com/kermitt2/grobid) and store the result in **S3**, using [grobidclient](https://github.com/miku/grobidclient) Go library
+* generate text from PDF via [pdftotext](https://www.xpdfreader.com/pdftotext-man.html) and store the result in S3 ([seaweedfs](https://github.com/seaweedfs/seaweedfs))
+* generate a thumbnail from PDF via **pdftoppm** and store the result in S3 ([seaweedfs](https://github.com/seaweedfs/seaweedfs))
 * find all weblinks in the PDF text and send them to a crawl API (wip)
 
 More tasks can be added by extending blobproc itself. A focus remains on simple
 deployment via an OS distribution package. By pushing various parts into library
-functions (or external packages like [grobidclient](https://miku/grobidclient)), the main processing code shrinks to about [100 lines of
+functions (or external packages like [grobidclient](https://miku/grobidclient)), the main processing routine shrinks to about [100 lines of
 code](https://github.com/miku/blobproc/blob/37f9cd7873f1e08400f46e98640e2b24bd37a088/walker.go#L64-L166)
 (as of 08/2024). Currently both blobproc and blobprocd run on a dual-core [2nd
 gen
-XEON](https://ark.intel.com/content/www/us/en/ark/products/193394/intel-xeon-silver-4216-processor-22m-cache-2-10-ghz.html);
-blobprocd received up to 100 rps and wrote pdfs to rotational
-disk.
+XEON](https://ark.intel.com/content/www/us/en/ark/products/193394/intel-xeon-silver-4216-processor-22m-cache-2-10-ghz.html) with 24GB of RAM;
+blobprocd received up to 100 rps and wrote pdfs to rotational disk.
 
 ## Bulk, back-of-the-envelope, reprocessing
 
