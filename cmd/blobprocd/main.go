@@ -28,7 +28,7 @@ var (
 	accessLogFile    = flag.String("access-log", "", "server access logfile, none if empty")
 	logFile          = flag.String("log", "", "structured log output file, stderr if empty")
 	urlMapFile       = flag.String("urlmap", "", "path to sqlite3 file that will record (url, sha1) pairs; if empty nothing is recorded")
-	urlMapHttpHeader = flag.String("urlmap-header", "X-BLOBPROC-URL", "HTTP header to use as URL for the URL map db, if available")
+	urlMapHttpHeader = flag.String("urlmap-header", blobproc.DefaultURLMapHttpHeader, "HTTP header to use as URL for the URL map db, if available")
 )
 
 func main() {

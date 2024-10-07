@@ -18,7 +18,10 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const tempFilePattern = "blobprocd-*"
+const (
+	tempFilePattern         = "blobprocd-*"
+	DefaultURLMapHttpHeader = "X-BLOBPROC-URL"
+)
 
 var errShortName = errors.New("short name")
 
@@ -227,6 +230,8 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	// Optional: persist the URL/SHA1 pair in an sqlite3 database. If no header
+	// is found or no URLMap database initialized, nothing will happen.
 	curi := r.Header.Get("X-BLOBPROC-URL")
 	if curi == "" {
 		// TODO: Heritrix is the only client that uses this header; move
