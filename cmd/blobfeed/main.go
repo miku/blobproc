@@ -1,5 +1,5 @@
-// blobfeed can feed blobprocd from files, WARCs, items and collections. This
-// tool can be used to backfill pdf postprocessing items.
+// blobfeed can feed blobprocd files, WARCs, items and collections. This tool
+// can be used to backfill pdf postprocessing items.
 package main
 
 import (
