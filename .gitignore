@@ -23,6 +23,7 @@ go.work.sum
 
 /blobprocd
 /blobproc
+/blobfeed
 packaging/deb/blobproc/usr/*
 *.deb
 

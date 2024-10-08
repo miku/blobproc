@@ -2,12 +2,18 @@
 package dedent
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
 
 var whitespaceOnly = regexp.MustCompile("(?m)^[ \t]+$")
 var leadingWhitespace = regexp.MustCompile("(?m)(^[ \t]*)")
+
+func Sprintf(format string, a ...any) string {
+	s := fmt.Sprintf(format, a...)
+	return Dedent(s)
+}
 
 // Dedent removes any common leading whitespace from every line in s.
 //
