@@ -20,6 +20,7 @@ var (
 	server         = flag.String("s", "http://localhost:9444", "blobprocd server")
 	sendFile       = flag.String("f", "", "pdf file or url to send to blobprocd")
 	sendWarc       = flag.String("w", "", "send all pdfs found in a WARC file to blobproc")
+	sendCdx        = flag.String("x", "", "send all pdfs found in a CDX file")
 	sendItem       = flag.String("i", "", "send all pdfs found in all WARC files from an item")
 	sendCollection = flag.String("c", "", "send all pdfs found in all WARC files found in items")
 	timeout        = flag.Duration("T", 30*time.Second, "timeout")
@@ -71,7 +72,10 @@ func main() {
 			log.Printf("send failed")
 			log.Fatal(string(b))
 		}
+	case *sendCdx != "":
+
 	case *sendWarc != "":
+		// parse a warc
 	case *sendItem != "":
 	case *sendCollection != "":
 	}
