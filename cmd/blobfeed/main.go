@@ -57,7 +57,6 @@ func main() {
 				curlOpts,
 				*sendFile,
 				blobproc.Version,
-				*sendFile,
 				spoolURL,
 			)
 		}
