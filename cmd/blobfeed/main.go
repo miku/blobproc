@@ -1,5 +1,6 @@
 // blobfeed can feed blobprocd files, WARCs, items and collections. This tool
-// can be used to backfill pdf postprocessing items.
+// can be used to backfill pdf postprocessing items. You will need blobprocd
+// running on some server.
 package main
 
 import (
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -72,7 +74,31 @@ func main() {
 			log.Fatal(string(b))
 		}
 	case *sendCdx != "":
-
+		switch {
+		case strings.HasPrefix(*sendCdx, "http"):
+			// CDX file from web
+			// ensure, curl is installed
+			var c string // command string
+			if _, err := exec.LookPath("curl"); err != nil {
+				log.Fatal("curl is required")
+			}
+			curlOpts := fmt.Sprintf(`--retry-max-time %d --retry 3`, int(timeout.Seconds()))
+			// move cdx into a temporary file
+			f, err := os.CreateTemp("", "blobfeed-cdx-*")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+			c = dedent.Sprintf(`
+				curl %s %q > %q`,
+				curlOpts,
+				*sendCdx,
+				f.Name(),
+			)
+			log.Println(c)
+		default:
+			// CDX file on disk
+		}
 	case *sendWarc != "":
 		// parse a warc
 	case *sendItem != "":
