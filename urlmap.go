@@ -43,7 +43,8 @@ func (u *URLMap) EnsureDB() error {
 }
 
 // Insert inserts a new pair into the database. We lock at the application
-// level to avoid 'database is locked (5) (SQLITE_BUSY)'
+// level to avoid 'database is locked (5) (SQLITE_BUSY)'. This will panic, if
+// the database has not been initialized before.
 func (u *URLMap) Insert(url, sha1 string) error {
 	u.mu.Lock()
 	_, err := u.db.Exec(`insert into map (url, sha1) values (?, ?)`, url, sha1)
