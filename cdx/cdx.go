@@ -2,7 +2,9 @@
 package cdx
 
 import (
+	"crypto/sha1"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +16,9 @@ var ErrParsingFailed = errors.New("cdx parsing failed")
 func New(loc string) *File {
 	switch {
 	case strings.HasPrefix(loc, "http"):
+		// TODO: download to a cache location
+		h := sha1.New()
+		_, _ = io.WriteString(h, loc)
 	default:
 		// TODO: assume local file path
 	}
@@ -71,6 +76,16 @@ type File struct {
 // Doer is a minimal http client surface.
 type Doer interface {
 	Do(req http.Request) (resp http.Response, err error)
+}
+
+// LocalFetcher plucks out a blob from a downloaded, compressed WARC file using streaming gz format.
+type LocalFetcher struct {
+	Path string
+}
+
+// Fetch fetches the actual blob from wayback with range requests.
+func (f *LocalFetcher) Fetch(record *Record) ([]byte, error) {
+	return nil, nil
 }
 
 // WaybackFetcher can fetch the blob for a given CDX record efficiently with

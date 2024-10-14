@@ -67,6 +67,7 @@ func main() {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 		defer cancel()
+		// TODO: https://sg.run/W8lA
 		cmd := exec.CommandContext(ctx, "bash", "-c", c)
 		b, err := cmd.CombinedOutput()
 		if err != nil {
