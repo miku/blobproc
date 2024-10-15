@@ -5,12 +5,14 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
 	"flag"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 	"time"
 
@@ -71,33 +73,45 @@ func main() {
 		cmd := exec.CommandContext(ctx, "bash", "-c", c)
 		b, err := cmd.CombinedOutput()
 		if err != nil {
-			log.Printf("send failed")
+			log.Printf("send failed: %v", err)
 			log.Fatal(string(b))
 		}
 	case *sendCdx != "":
 		switch {
 		case strings.HasPrefix(*sendCdx, "http"):
-			// CDX file from web
-			// ensure, curl is installed
-			var c string // command string
-			if _, err := exec.LookPath("curl"); err != nil {
-				log.Fatal("curl is required")
+			h := sha1.New()
+			cacheName := fmt.Sprintf("blobfeed-cdx-%x", h.Sum([]byte(*sendCdx)))
+			cachePath := path.Join(os.TempDir(), cacheName)
+			if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+				// CDX file from web
+				// ensure, curl is installed
+				if _, err := exec.LookPath("curl"); err != nil {
+					log.Fatal("curl is required")
+				}
+				curlOpts := fmt.Sprintf(`--retry-max-time %d --retry 3`, int(timeout.Seconds()))
+				// move cdx into a temporary file
+				f, err := os.Create(cachePath + ".wip")
+				if err != nil {
+					log.Fatal(err)
+				}
+				defer f.Close()
+				c := dedent.Sprintf(`curl %s %q > %q`, curlOpts, *sendCdx, f.Name())
+				ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+				defer cancel()
+				cmd := exec.CommandContext(ctx, "bash", "-c", c)
+				b, err := cmd.CombinedOutput()
+				if err != nil {
+					log.Printf("fetching cdx failed: %v", err)
+					log.Fatal(string(b))
+				}
+				if err := os.Rename(cachePath+".wip", cachePath); err != nil {
+					log.Fatal(err)
+				}
 			}
-			curlOpts := fmt.Sprintf(`--retry-max-time %d --retry 3`, int(timeout.Seconds()))
-			// move cdx into a temporary file
-			f, err := os.CreateTemp("", "blobfeed-cdx-*")
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer f.Close()
-			c = dedent.Sprintf(`
-				curl %s %q > %q`,
-				curlOpts,
-				*sendCdx,
-				f.Name(),
-			)
-			log.Println(c)
+			*sendCdx = cachePath
+			fallthrough
 		default:
+			log.Println("cdx on disk: %s", *sendCdx)
 			// CDX file on disk
 		}
 	case *sendWarc != "":

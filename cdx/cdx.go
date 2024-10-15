@@ -2,7 +2,7 @@
 package cdx
 
 import (
-	"crypto/sha1"
+	"bufio"
 	"errors"
 	"io"
 	"net/http"
@@ -12,21 +12,9 @@ import (
 
 var ErrParsingFailed = errors.New("cdx parsing failed")
 
-// New returns a new File which allows to access records.
-func New(loc string) *File {
-	switch {
-	case strings.HasPrefix(loc, "http"):
-		// TODO: download to a cache location
-		h := sha1.New()
-		_, _ = io.WriteString(h, loc)
-	default:
-		// TODO: assume local file path
-	}
-	// TODO: if remote, cache a copy and use that
-	// curl -vL -r 127643789-128007786
-	// https://archive.org/download/OJS-SITEMAP-PATCH-CRAWL-2024-07-20240823202754595-00000-00053-wbgrp-crawl666/OJS-SITEMAP-PATCH-CRAWL-2024-07-20240823222729780-00025-1703702~wbgrp-crawl666.us.archive.org~8443.warc.gz
-	// -o x.pdf.gz
-	return nil
+// New returns a File that allows to access CDX records.
+func New(r io.Reader) *File {
+	return &File{r: bufio.NewReader(r)}
 }
 
 // Record is a subset of fields from a CDX line. TODO: build this out to a full
@@ -70,7 +58,11 @@ func ParseRecord(line string) (*Record, error) {
 
 // File is a CDX file.
 type File struct {
-	Path string
+	r *bufio.Reader
+}
+
+func (f *File) Next() (*Record, error) {
+	return nil, nil
 }
 
 // Doer is a minimal http client surface.
