@@ -12,9 +12,9 @@ import (
 
 var ErrParsingFailed = errors.New("cdx parsing failed")
 
-// New returns a File that allows to access CDX records.
-func New(r io.Reader) *File {
-	return &File{r: bufio.NewReader(r)}
+// New returns a Reader that allows to access CDX records.
+func New(r io.Reader) *Reader {
+	return &Reader{r: bufio.NewReader(r)}
 }
 
 // Record is a subset of fields from a CDX line. TODO: build this out to a full
@@ -56,13 +56,26 @@ func ParseRecord(line string) (*Record, error) {
 	return record, nil
 }
 
-// File is a CDX file.
-type File struct {
+// Reader is a CDX reader.
+type Reader struct {
 	r *bufio.Reader
 }
 
-func (f *File) Next() (*Record, error) {
-	return nil, nil
+// Next returns the next parsed CDX record or an error if processing failed.
+// Returns io.EOF, if there are no more records.
+func (r *Reader) Next() (*Record, error) {
+	line, err := r.r.ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	line = strings.TrimSpace(line)
+	if strings.HasPrefix(line, "CDX") {
+		line, err = r.r.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ParseRecord(line)
 }
 
 // Doer is a minimal http client surface.
