@@ -11,8 +11,13 @@ number of external components and little to no state.
 
 BLOBPROC currently ships with two cli programs:
 
-* **blobprocd** exposes an HTTP server that can receive binary data and stores it in a [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
-* **blobproc** is a process that scans the spool folder and executes post processing tasks on each PDF, and removes the file from spool, if all processing succeeded
+* **blobprocd** exposes an HTTP server that can receive binary data and stores
+  it in a
+  [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
+* **blobproc** is a process that scans the spool folder and executes post
+  processing tasks on each PDF, and removes the file from spool, if a
+  best-effort-style processing of the file is done (peridically called by a
+  systemd timer)
 
 In our case pdf data may come from:
 
