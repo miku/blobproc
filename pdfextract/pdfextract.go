@@ -185,8 +185,7 @@ func extractPDFMetadata(ctx context.Context, filename string) (*pdfinfo.Metadata
 	return pdfinfo.ParseFile(ctx, filename)
 }
 
-// ProcessFile turns a PDF file to a structured output. TODO: group options
-// in a struct, as we may add more.
+// ProcessFile turns a PDF file to a structured output.
 func ProcessFile(ctx context.Context, filename string, opts *Options) *Result {
 	f, err := os.Open(filename)
 	if err != nil {
@@ -204,8 +203,10 @@ func ProcessFile(ctx context.Context, filename string, opts *Options) *Result {
 	return ProcessBlob(ctx, b, opts)
 }
 
-// ProcessBlob takes a blob and returns a pdf extract result. TODO: we can makes
-// this faster by running various subprocesses in parallel.
+// ProcessBlob takes a blob and returns a pdf extract result. TODO(martin): we
+// can makes this faster by running various subprocesses in parallel.
+// TODO(martin): we take a blob from memory only to persist it and run the cli
+// tools over it, we should not require that much memory.
 func ProcessBlob(ctx context.Context, blob []byte, opts *Options) *Result {
 	var fi = new(FileInfo)
 	fi.FromBytes(blob)
