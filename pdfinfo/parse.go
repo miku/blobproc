@@ -126,38 +126,42 @@ type Dim struct {
 	Height float64
 }
 
-// PageDim parses pdfinfo page size ourput into a Dim. Returns the zero value
+// PageDim parses pdfinfo page size output into a Dim. Returns the zero value
 // Dim for unparsable data.
 func (info *Info) PageDim() Dim {
 	if info == nil {
 		return Dim{}
 	}
-	// 463.059 x 668.047 pts
-	// 595 x 882 pts
-	re := regexp.MustCompile(`(?<width>[0-9.]*)[\s]*x[\s]*(?<height>[0-9.]*)`)
-	matches := re.FindStringSubmatch(info.PageSize)
+	var (
+		// 463.059 x 668.047 pts
+		// 595 x 882 pts
+		re            = regexp.MustCompile(`(?<width>[0-9.]*)[\s]*x[\s]*(?<height>[0-9.]*)`)
+		matches       = re.FindStringSubmatch(info.PageSize)
+		width, height float64
+		err           error
+	)
 	if len(matches) < 3 {
 		return Dim{}
 	}
-	width, err := strconv.ParseFloat(matches[re.SubexpIndex("width")], 64)
-	if err != nil {
+	if width, err = strconv.ParseFloat(matches[re.SubexpIndex("width")], 64); err != nil {
 		return Dim{}
 	}
-	height, err := strconv.ParseFloat(matches[re.SubexpIndex("height")], 64)
-	if err != nil {
+	if height, err = strconv.ParseFloat(matches[re.SubexpIndex("height")], 64); err != nil {
 		return Dim{}
 	}
-	dim := Dim{
+	return Dim{
 		Width:  width,
 		Height: height,
 	}
-	return dim
 }
 
 // ParseFile a filename into a structured metadata object. Requires pdfinfo and
 // pdfcpu to be installed. The filename must have .pdf extension, otherwise
 // pdfcpu will fail.
 func ParseFile(ctx context.Context, filename string) (*Metadata, error) {
+	if !strings.HasSuffix(filename, ".pdf") {
+		return nil, fmt.Errorf("pdfcpu requires an explicit .pdf filename")
+	}
 	if _, err := exec.LookPath("pdfcpu"); err != nil {
 		return nil, fmt.Errorf("missing pdfcpu executable")
 	}
@@ -178,7 +182,7 @@ func ParseFile(ctx context.Context, filename string) (*Metadata, error) {
 	return metadata, nil
 }
 
-// ParseFile parses a pdf file. Requires pdfinfo executable to be installed.
+// runPdfCpu parses a pdf file. Requires pdfcpu executable to be installed.
 // The filename must have .pdf extension, otherwise pdfcpu will fail.
 func runPdfCpu(ctx context.Context, filename string) (*PDFCPU, error) {
 	var buf bytes.Buffer
@@ -289,6 +293,7 @@ func parseBool(s string) bool {
 	return false
 }
 
+// parseInt return 0, if no other value could be parsed.
 func parseInt(s string) int {
 	v, err := strconv.Atoi(s)
 	if err != nil {
@@ -297,6 +302,7 @@ func parseInt(s string) int {
 	return v
 }
 
+// parseAnyInt will return the first token in a given string, that could be parsed into an int.
 func parseAnyInt(s string) int {
 	for _, tok := range strings.Fields(s) {
 		v, err := strconv.Atoi(tok)

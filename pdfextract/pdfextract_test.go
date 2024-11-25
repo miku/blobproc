@@ -139,7 +139,7 @@ func TestPdfExtract(t *testing.T) {
 			ThumbType: "jpg",
 		})
 		if result.Status != c.status {
-			t.Fatalf("got %v, want %v", result.Status, c.status)
+			t.Fatalf("got %v, want %v (%s, %v)", result.Status, c.status, c.filename, result.Err)
 		}
 		if result.Status != "success" {
 			continue
