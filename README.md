@@ -25,7 +25,7 @@ BLOBPROC currently ships with two cli programs:
 
 In our case pdf data may come from:
 
-* Heritrix crawl, via a [ScriptedProcessor](https://github.com/miku/blobproc/blob/bf5b5a3f5f7e38f996ec4be9179855f4b059cfb7/extra/heritrix/fetch-processor-snippet.xml#L30-L137)
+* Heritrix crawl, via a [ScriptedProcessor](https://github.com/miku/blobproc/blob/af56ac639180bf29476942053a12d76cf1e5644b/extra/heritrix/fetch-processor-snippet.xml#L30-L137)
 * (wip) a WARC file, a crawl collection or similar
 * in general, by any process that can deposit a file in the spool folder or send an HTTP request to blobprocd
 
