@@ -17,11 +17,11 @@ BLOBPROC currently ships with two cli programs:
 
 * **blobprocd** exposes an HTTP server that can receive binary data and stores
   it in a
-  [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
+  [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder (maybe a better name would be `blob-spoold`)
 * **blobproc** is a process that scans the spool folder and executes post
   processing tasks on each PDF, and removes the file from spool, if a
   best-effort-style processing of the file is done (periodically called by a
-  systemd timer)
+  systemd timer) (this is a one off command, not a server)
 
 In our case pdf data may come from:
 
