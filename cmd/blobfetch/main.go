@@ -6,6 +6,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 
 	"github.com/miku/blobproc/fetchutils"
 )
@@ -21,10 +22,18 @@ func main() {
 	flag.Parse()
 	switch {
 	case *fromWarcFile != "":
-		wf := &fetchutils.WarcFetch{Location: *fromWarcFile}
-		if err := wf.Run(); err != nil {
+		// wf := &fetchutils.WarcFetch{Location: *fromWarcFile}
+		// if err := wf.Run(); err != nil {
+		// 	log.Fatal(err)
+		// }
+		dir, err := os.MkdirTemp("", "blobfetch-warc-pdf-finder-*")
+		if err != nil {
 			log.Fatal(err)
 		}
+		if err := fetchutils.ProcessWARCForPDFs(*fromWarcFile, dir, true); err != nil {
+			log.Fatal(err)
+		}
+		log.Println(dir)
 	case *fromCdxFile != "":
 	case *fromItem != "":
 	case *fromCollection != "":
