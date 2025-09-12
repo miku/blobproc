@@ -9,6 +9,10 @@ sandcrawler, which is part of [IA Scholar](https://scholar.archive.org) infra.
 Specifically it is designed to process and persist documents with minimum
 number of external components and little to no state.
 
+The goal is to have artifacts (fulltext, thumbnails, metadata, ...)  derived
+from millions of PDF files available in a storage system (e.g. S3). In the best
+case, the artifacts can be kept up to do in an unattended way.
+
 BLOBPROC currently ships with two cli programs:
 
 * **blobprocd** exposes an HTTP server that can receive binary data and stores

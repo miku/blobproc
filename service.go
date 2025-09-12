@@ -33,10 +33,7 @@ type WebSpoolService struct {
 	// TODO: add a (optional) reference to a store for url content hashes; it
 	// would be good to keep it optional (so one may just copy files into the
 	// spool folder), and maybe to provide a simple interface that can be
-	// easily fulfilled by different backend; it would be good to keep it
-	// optional (so one may just copy files into the spool folder), and maybe
-	// to provide a simple interface that can be easily fulfilled by different
-	// backend.
+	// easily fulfilled by different backend.
 	URLMap *URLMap
 	// The HTTP header to look for a URL associated with a pdf blob payload.
 	URLMapHttpHeader string
