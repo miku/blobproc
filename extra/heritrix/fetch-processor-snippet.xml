@@ -50,7 +50,7 @@ import java.util.logging.Logger;
 Logger log = Logger.getLogger("org.archive.scholar.blob.ScriptedProcessor");
 
 // svcURL is where we are sending POST requests to; TODO: make this configurable
-String svcURL = "http://wbgrp-svc263.us.archive.org:9444/spool";
+String svcURL = "http://example.org:9444/spool";
 // userAgent to identify this snippet
 String userAgent = "heritrix-send-off/0.1";
 
