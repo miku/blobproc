@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-TARGETS := blobprocd blobproc
+TARGETS := blobprocd blobproc blobfetch
 PKGNAME := blobproc
 MAKEFLAGS := --jobs=$(shell nproc)
 VERSION := 0.3.26 # change this and then run "make update-version"

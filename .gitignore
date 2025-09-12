@@ -23,10 +23,11 @@ go.work.sum
 
 /blobprocd
 /blobproc
-/blobfeed
+/blobfetch
 packaging/deb/blobproc/usr/*
 *.deb
 
 .venv
 coverage.out
 coverage.html
+
