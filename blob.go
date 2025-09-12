@@ -101,10 +101,10 @@ func blobPath(folder, sha1hex, ext, prefix string) string {
 		prefix, folder, sha1hex[0:2], sha1hex[2:4], sha1hex, ext)
 }
 
-// PutBlob takes puts data in to S3 with key derived from the given options. If
-// the options do not contain the SHA1 of the content, it gets computed here.
-// If no bucket name is given, a default bucket name is used. If the bucket
-// does not exist, if gets created.
+// PutBlob puts data in to S3 with key derived from the given options. If the
+// options do not contain the SHA1 of the content, it gets computed here.  If
+// no bucket name is given, a default bucket name is used. If the bucket does
+// not exist, if gets created.
 func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutBlobResponse, error) {
 	if req.SHA1Hex == "" {
 		h := sha1.New()

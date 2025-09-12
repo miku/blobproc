@@ -16,7 +16,7 @@ BLOBPROC currently ships with two cli programs:
   [spool](https://refspecs.linuxfoundation.org/FHS_3.0/fhs/ch05s14.html) folder
 * **blobproc** is a process that scans the spool folder and executes post
   processing tasks on each PDF, and removes the file from spool, if a
-  best-effort-style processing of the file is done (peridically called by a
+  best-effort-style processing of the file is done (periodically called by a
   systemd timer)
 
 In our case pdf data may come from:
