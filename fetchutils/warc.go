@@ -1,6 +1,7 @@
 package fetchutils
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -54,9 +55,52 @@ func (wf *WarcFetch) Run() error {
 		if err != nil {
 			return err
 		}
-		log.Println(record.Header)
+		if record.Header.Get("WARC-Type") != "response" {
+			continue
+		}
+		if shouldProcess(record) {
+			fmt.Print("✅ ")
+		} else {
+			fmt.Print("   ")
+		}
+		fmt.Printf("[%s]: %s\n", record.Header.Get("WARC-Type"), record.Header.Get("WARC-Target-URI"))
 	}
 	return nil
+}
+
+func shouldProcess(record *warc.Record) bool {
+	if record.Header.Get("WARC-Type") != "response" {
+		return false
+	}
+	content := record.Content
+	if content == nil {
+		return false
+	}
+	if seeker, ok := content.(io.Seeker); ok {
+		seeker.Seek(0, io.SeekStart)
+	}
+	scanner := bufio.NewScanner(content)
+	if !scanner.Scan() {
+		return false
+	}
+	statusLine := scanner.Text()
+	if !strings.Contains(statusLine, "200") && !strings.Contains(statusLine, "HTTP/1.1 200") && !strings.Contains(statusLine, "HTTP/1.0 200") {
+		return false
+	}
+	contentType := ""
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || line == "\r" {
+			// End of headers
+			break
+		}
+		if strings.HasPrefix(strings.ToLower(line), "content-type:") {
+			contentType = strings.ToLower(strings.TrimSpace(line[13:]))
+			break
+		}
+	}
+	return strings.Contains(contentType, "application/pdf") ||
+		strings.Contains(contentType, "pdf")
 }
 
 func Download(dst string, url string) (err error) {
