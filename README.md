@@ -11,7 +11,7 @@ number of external components and little to no state.
 
 The goal is to have artifacts (fulltext, thumbnails, metadata, ...)  derived
 from millions of PDF files available in a storage system (e.g. S3). In the best
-case, the artifacts can be kept up to do in an unattended way.
+case, the artifacts can be kept up to date in an unattended way.
 
 BLOBPROC currently ships with two cli programs:
 
