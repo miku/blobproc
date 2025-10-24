@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"log/slog"
@@ -68,6 +69,7 @@ func main() {
 	var (
 		logLevel = slog.LevelInfo
 		h        slog.Handler
+		w        io.Writer
 	)
 	if *debug {
 		logLevel = slog.LevelDebug
@@ -80,10 +82,11 @@ func main() {
 			os.Exit(1)
 		}
 		defer f.Close()
-		h = slog.NewJSONHandler(f, &slog.HandlerOptions{Level: logLevel})
+		w = f
 	default:
-		h = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel})
+		w = os.Stderr
 	}
+	h = slog.NewJSONHandler(w, &slog.HandlerOptions{Level: logLevel})
 	logger := slog.New(h)
 	slog.SetDefault(logger)
 	switch {

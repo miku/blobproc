@@ -5,37 +5,44 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"os"
 
-	"github.com/miku/blobproc/fetchutils"
+	warc "github.com/internetarchive/gowarc"
 )
 
 var (
-	fromWarcFile   = flag.String("W", "", "start with a WARC file")
-	fromCdxFile    = flag.String("X", "", "use a cdx file to discover pdfs")
-	fromItem       = flag.String("I", "", "start from an item identifier")
-	fromCollection = flag.String("C", "", "start from a collection identifier")
+	fromWarcFile = flag.String("W", "", "start with a WARC file")
+	// fromCdxFile    = flag.String("X", "", "use a cdx file to discover pdfs")
+	// fromItem       = flag.String("I", "", "start from an item identifier")
+	// fromCollection = flag.String("C", "", "start from a collection identifier")
 )
 
 func main() {
 	flag.Parse()
 	switch {
 	case *fromWarcFile != "":
-		// wf := &fetchutils.WarcFetch{Location: *fromWarcFile}
-		// if err := wf.Run(); err != nil {
-		// 	log.Fatal(err)
-		// }
-		dir, err := os.MkdirTemp("", "blobfetch-warc-pdf-finder-*")
+		f, err := os.Open(*fromWarcFile)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if err := fetchutils.ProcessWARCForPDFs(*fromWarcFile, dir, true); err != nil {
+		defer f.Close()
+		wr, err := warc.NewReader(f)
+		if err != nil {
 			log.Fatal(err)
 		}
-		log.Println(dir)
-	case *fromCdxFile != "":
-	case *fromItem != "":
-	case *fromCollection != "":
+		for {
+			record, err := wr.ReadRecord()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Println(record.Header)
+		}
+	default:
+		log.Println("blobfetch")
 	}
 }
