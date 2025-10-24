@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -14,9 +15,7 @@ import (
 
 var (
 	fromWarcFile = flag.String("W", "", "start with a WARC file")
-	// fromCdxFile    = flag.String("X", "", "use a cdx file to discover pdfs")
-	// fromItem       = flag.String("I", "", "start from an item identifier")
-	// fromCollection = flag.String("C", "", "start from a collection identifier")
+	// TODO: CDX, item, collection
 )
 
 func main() {
@@ -40,7 +39,11 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Println(record.Header)
+			uri := record.Header.Get("WARC-Target-URI")
+			if len(uri) == 0 {
+				continue
+			}
+			fmt.Println(uri)
 		}
 	default:
 		log.Println("blobfetch")
