@@ -10,11 +10,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/miku/blobproc/ia"
 	"github.com/miku/blobproc/warcutil"
 )
+
+const appName = "blobproc"
 
 var (
 	fromItem     = flag.String("I", "", "item name")
@@ -28,8 +31,18 @@ func main() {
 	flag.Parse()
 	switch {
 	case *fromItem != "":
+		// prepare cache dir
+		cacheDir, err := os.UserCacheDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+		appCacheDir := path.Join(cacheDir, appName, "extracted")
+		if err := os.MkdirAll(appCacheDir, 0755); err != nil {
+			log.Fatal(err)
+		}
 		// ex: https://archive.org/metadata/OPENALEX-CRAWL-2025-09-20251011130616382-07663-07716-wbgrp-crawl047
 		link := fmt.Sprintf("https://archive.org/metadata/%s", *fromItem)
+		log.Printf("fetching: %s", link)
 		resp, err := http.Get(link)
 		if err != nil {
 			log.Fatal(err)
@@ -43,41 +56,38 @@ func main() {
 		if err := dec.Decode(&item); err != nil {
 			log.Fatal(err)
 		}
+		log.Printf("found %d files in %s", len(item.Files), *fromItem)
 		for i, file := range item.Files {
 			if !strings.HasSuffix(file.Name, ".warc.gz") {
 				continue
 			}
 			// https://archive.org/download/OPENALEX-CRAWL-2025-09-20251011130616382-07663-07716-wbgrp-crawl047/OPENALEX-CRAWL-2025-09-20251011144946523-07666-2129926~wbgrp-crawl047.us.archive.org~8443.warc.gz
-			downloadLink := fmt.Sprintf("https://archive.org/download/%s/%s", *fromItem, file.Name)
-			resp, err := http.Get(downloadLink)
+			fileURL := fmt.Sprintf("https://archive.org/download/%s/%s", *fromItem, file.Name)
+			resp, err := http.Get(fileURL)
 			if err != nil {
 				log.Fatal(err)
 			}
 			defer resp.Body.Close()
 
 			// sample extractor that would only output the pdf url as it is found in the warc
-			var processor warcutil.Processor
-			var DebugProcessor = warcutil.FuncProcessor(func(e warcutil.Extracted) error {
-				log.Println(i, e.URI)
+			var debugProcessor = warcutil.FuncProcessor(func(e *warcutil.Extracted) error {
+				if e.StatusCode != http.StatusOK {
+					return nil
+				}
+				log.Println(i, e.StatusCode, e.Size, e.URI)
 				return nil
 			})
-			switch {
-			case *outputDir != "":
-				processor = &warcutil.DirProcessor{
-					Dir:       *outputDir,
-					Prefix:    "blobfetch-",
-					Extension: ".pdf",
-				}
-			case *postURL != "":
-			default:
-				// processor = warcutil.DebugProcessor
-				processor = DebugProcessor
-			}
 			extractor := warcutil.Extractor{
 				Filters: []warcutil.ResponseFilter{
 					warcutil.PDFResponseFilter,
 				},
-				Processors: []warcutil.Processor{processor},
+				Processors: []warcutil.Processor{
+					debugProcessor,
+					&warcutil.HashDirProcessor{
+						Dir:       appCacheDir,
+						Extension: ".pdf",
+					},
+				},
 			}
 			if err := extractor.Extract(resp.Body); err != nil {
 				log.Fatal(err)

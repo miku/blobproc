@@ -3,11 +3,15 @@ package warcutil
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
+	"hash"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -16,6 +20,7 @@ import (
 
 type Extracted struct {
 	URI         string
+	StatusCode  int
 	ContentType string
 	Content     io.Reader
 	Size        int64
@@ -23,14 +28,24 @@ type Extracted struct {
 }
 
 type Processor interface {
-	Process(Extracted) error
+	Process(*Extracted) error
 }
 
-type FuncProcessor func(Extracted) error
+type FuncProcessor func(*Extracted) error
 
-func (f FuncProcessor) Process(ex Extracted) error {
+func (f FuncProcessor) Process(ex *Extracted) error {
 	return f(ex)
 }
+
+var (
+	NoSharding     = func(hash string) string { return "" }
+	ShardByPrefix2 = func(hash string) string {
+		if len(hash) >= 2 {
+			return hash[:2]
+		}
+		return ""
+	}
+)
 
 type ResponseFilter func(resp *http.Response) bool
 
@@ -39,7 +54,7 @@ var PDFResponseFilter = func(resp *http.Response) bool {
 	return strings.HasPrefix(ct, "application/pdf")
 }
 
-var DebugProcessor = FuncProcessor(func(e Extracted) error {
+var DebugProcessor = FuncProcessor(func(e *Extracted) error {
 	log.Println(e.URI)
 	return nil
 })
@@ -51,7 +66,7 @@ type DirProcessor struct {
 	Extension string
 }
 
-func (d *DirProcessor) Process(ex Extracted) error {
+func (d *DirProcessor) Process(ex *Extracted) error {
 	f, err := os.CreateTemp(d.Dir, fmt.Sprintf("%s*%s", d.Prefix, d.Extension))
 	if err != nil {
 		return err
@@ -63,6 +78,60 @@ func (d *DirProcessor) Process(ex Extracted) error {
 	return nil
 }
 
+// HashDirProcessor writes extracted files into a given directory,
+// using the hash of the content as the filename.
+// Defaults to SHA1 if no HashFunc is provided.
+type HashDirProcessor struct {
+	Dir       string
+	Extension string
+	HashFunc  func() hash.Hash         // Factory function that returns a hash.Hash
+	ShardFunc func(hash string) string // Returns subdirectory path; empty string means no sharding
+}
+
+func (h *HashDirProcessor) Process(ex *Extracted) error {
+	hashFunc := h.HashFunc
+	if hashFunc == nil {
+		hashFunc = func() hash.Hash { return sha1.New() }
+	}
+	hasher := hashFunc()
+	tf, err := os.CreateTemp(h.Dir, "temp-*")
+	if err != nil {
+		return err
+	}
+	temp := tf.Name()
+	defer os.Remove(temp)
+	mw := io.MultiWriter(tf, hasher)
+	if _, err := io.Copy(mw, ex.Content); err != nil {
+		if err == io.EOF {
+			// TODO: why this fail?
+			// 2025/11/07 18:10:59 copy [200] https://www.ideals.illinois.edu/items/98350/bitstreams/315024/data.pdf (9877698): unexpected EOF
+			// 2025/11/07 18:10:59 unexpected EOF
+			return nil
+		}
+		_ = tf.Close()
+		return err
+	}
+	if err := tf.Close(); err != nil {
+		return err
+	}
+	hexHash := hex.EncodeToString(hasher.Sum(nil))
+	targetDir := h.Dir
+	if h.ShardFunc != nil {
+		if subdir := h.ShardFunc(hexHash); subdir != "" {
+			targetDir = filepath.Join(h.Dir, subdir)
+			if err := os.MkdirAll(targetDir, 0755); err != nil {
+				return err
+			}
+		}
+	}
+	filename := hexHash
+	if h.Extension != "" {
+		filename = filename + h.Extension
+	}
+	dst := filepath.Join(targetDir, filename)
+	return os.Rename(temp, dst)
+}
+
 type Doer interface {
 	Do(*http.Request) (*http.Response, error)
 }
@@ -72,7 +141,7 @@ type HttpPostProcessor struct {
 	Client Doer
 }
 
-func (h *HttpPostProcessor) Process(ex Extracted) error {
+func (h *HttpPostProcessor) Process(ex *Extracted) error {
 	if h.Client == nil {
 		h.Client = http.DefaultClient
 	}
@@ -146,8 +215,9 @@ func (e *Extractor) Extract(r io.Reader) error {
 			_ = resp.Body.Close()
 			continue
 		}
-		extracted := Extracted{
+		extracted := &Extracted{
 			URI:         uri,
+			StatusCode:  resp.StatusCode,
 			ContentType: resp.Header.Get("Content-Type"),
 			Content:     resp.Body,
 			Size:        resp.ContentLength,
@@ -158,6 +228,7 @@ func (e *Extractor) Extract(r io.Reader) error {
 				return err
 			}
 		}
+		_ = resp.Body.Close()
 	}
 	return nil
 }
