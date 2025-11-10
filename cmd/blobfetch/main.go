@@ -17,12 +17,15 @@ import (
 	"github.com/miku/blobproc/warcutil"
 )
 
-const appName = "blobproc"
+const (
+	appName   = "blobproc"
+	extracted = "extracted"
+)
 
 var (
-	fromItem     = flag.String("I", "", "item name")
-	fromWarcFile = flag.String("W", "", "start with a WARC file")
-	outputDir    = flag.String("o", "", "output directory")
+	fromItem     = flag.String("I", "", "item name, e.g. 'HELLO-CRAWL-2020-10-20250920135023817-00102-00152-123'")
+	fromWarcFile = flag.String("W", "", "start with a local WARC file")
+	outputDir    = flag.String("o", "", "output directory, by default, use users cache dir")
 	postURL      = flag.String("u", "", "POST extracted content to URL")
 	// TODO: CDX, item, collection
 )
@@ -36,7 +39,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		appCacheDir := path.Join(cacheDir, appName, "extracted")
+		appCacheDir := path.Join(cacheDir, appName, extracted)
 		if err := os.MkdirAll(appCacheDir, 0755); err != nil {
 			log.Fatal(err)
 		}
@@ -77,16 +80,20 @@ func main() {
 				log.Println(i, e.StatusCode, e.Size, e.URI)
 				return nil
 			})
+			var httpPostProcessor = &warcutil.HttpPostProcessor{
+				URL: "http://localhost:9090",
+			}
 			extractor := warcutil.Extractor{
 				Filters: []warcutil.ResponseFilter{
 					warcutil.PDFResponseFilter,
 				},
 				Processors: []warcutil.Processor{
 					debugProcessor,
-					&warcutil.HashDirProcessor{
-						Dir:       appCacheDir,
-						Extension: ".pdf",
-					},
+					httpPostProcessor,
+					// &warcutil.HashDirProcessor{
+					// 	Dir:       appCacheDir,
+					// 	Extension: ".pdf",
+					// },
 				},
 			}
 			if err := extractor.Extract(resp.Body); err != nil {
