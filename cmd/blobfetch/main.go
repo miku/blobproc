@@ -26,7 +26,7 @@ var (
 	fromItem     = flag.String("I", "", "item name, e.g. 'HELLO-CRAWL-2020-10-20250920135023817-00102-00152-123'")
 	fromWarcFile = flag.String("W", "", "start with a local WARC file")
 	outputDir    = flag.String("o", "", "output directory, by default, use users cache dir")
-	postURL      = flag.String("u", "", "POST extracted content to URL")
+	postURL      = flag.String("u", "", "POST extracted content to this URL")
 	// TODO: CDX, item, collection
 )
 
