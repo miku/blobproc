@@ -80,21 +80,24 @@ func main() {
 				log.Println(i, e.StatusCode, e.Size, e.URI)
 				return nil
 			})
-			var httpPostProcessor = &warcutil.HttpPostProcessor{
-				URL: "http://localhost:9090",
-			}
 			extractor := warcutil.Extractor{
 				Filters: []warcutil.ResponseFilter{
 					warcutil.PDFResponseFilter,
 				},
 				Processors: []warcutil.Processor{
 					debugProcessor,
-					httpPostProcessor,
+					// httpPostProcessor,
 					// &warcutil.HashDirProcessor{
 					// 	Dir:       appCacheDir,
 					// 	Extension: ".pdf",
 					// },
 				},
+			}
+			if *postURL != "" {
+				var httpPostProcessor = &warcutil.HttpPostProcessor{
+					URL: *postURL,
+				}
+				extractor.Processors = append(extractor.Processors, httpPostProcessor)
 			}
 			if err := extractor.Extract(resp.Body); err != nil {
 				log.Fatal(err)
