@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
@@ -121,7 +122,7 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 	if req.Bucket == "" {
 		req.Bucket = DefaultBucket
 	}
-	ok, err := wrap.Client.BucketExists(context.Background(), req.Bucket)
+	ok, err := wrap.Client.BucketExists(ctx, req.Bucket)
 	if err != nil {
 		slog.Error("bucket exist failed", "err", err)
 		return nil, err
@@ -133,18 +134,24 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 			return nil, err
 		}
 	}
-	contentType := "application/octet-stream"
-	if strings.HasSuffix(req.Ext, ".xml") {
-		contentType = "application/xml"
-	}
-	if strings.HasSuffix(req.Ext, ".png") {
-		contentType = "image/png"
-	}
-	if strings.HasSuffix(req.Ext, ".jpg") || strings.HasSuffix(req.Ext, ".jpeg") {
-		contentType = "image/jpeg"
-	}
-	if strings.HasSuffix(req.Ext, ".txt") {
-		contentType = "text/plain"
+	// Use mimetype detection for more accurate content type detection
+	mtype := mimetype.Detect(req.Blob)
+	contentType := mtype.String()
+	if contentType == "" {
+		// Fallback to extension-based detection if mimetype detection fails
+		contentType = "application/octet-stream"
+		if strings.HasSuffix(req.Ext, ".xml") {
+			contentType = "application/xml"
+		}
+		if strings.HasSuffix(req.Ext, ".png") {
+			contentType = "image/png"
+		}
+		if strings.HasSuffix(req.Ext, ".jpg") || strings.HasSuffix(req.Ext, ".jpeg") {
+			contentType = "image/jpeg"
+		}
+		if strings.HasSuffix(req.Ext, ".txt") {
+			contentType = "text/plain"
+		}
 	}
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,

@@ -26,6 +26,27 @@ const (
 
 var errShortName = errors.New("short name")
 
+// LimitedReader wraps an io.Reader and limits the number of bytes that can be read
+type LimitedReader struct {
+	R        io.Reader
+	N        int64
+	MaxBytes int64
+}
+
+func (l *LimitedReader) Read(p []byte) (n int, err error) {
+	if l.N >= l.MaxBytes {
+		return 0, fmt.Errorf("file size exceeds maximum allowed size of %d bytes", l.MaxBytes)
+	}
+	// Calculate how much we're allowed to read
+	allowed := l.MaxBytes - l.N
+	if int64(len(p)) > allowed {
+		p = p[:allowed]
+	}
+	n, err = l.R.Read(p)
+	l.N += int64(n)
+	return
+}
+
 // WebSpoolService saves web payload to a configured directory. TODO: add limit
 // in size (e.g. 80% of disk or absolute value)
 type WebSpoolService struct {
@@ -40,6 +61,8 @@ type WebSpoolService struct {
 	URLMapHttpHeader string
 	// Minimum required free disk space percentage (default 10%)
 	MinFreeDiskPercent int
+	// Maximum allowed file size (default 0 = no limit)
+	MaxFileSize int64
 }
 
 // spoolListEntry collects basic information about a spooled file.
@@ -181,14 +204,21 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	ok, err := svc.hasSufficientDiskSpace()
 	if err != nil {
 		slog.Error("failed to check disk space", "err", err, "dir", svc.Dir)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to check available disk space", http.StatusInternalServerError)
 		return
 	}
 	if !ok {
 		slog.Warn("insufficient disk space, slowing down request", "dir", svc.Dir)
 		// Return HTTP 429 (Too Many Requests) to signal the client to slow down
 		w.Header().Set("Retry-After", "30") // Suggest retry after 30 seconds
-		w.WriteHeader(http.StatusTooManyRequests)
+		http.Error(w, "Insufficient disk space", http.StatusTooManyRequests)
+		return
+	}
+
+	// Check for content length if provided and validate against max file size
+	if svc.MaxFileSize > 0 && r.ContentLength > svc.MaxFileSize {
+		slog.Warn("file too large", "size", r.ContentLength, "max", svc.MaxFileSize)
+		http.Error(w, "File too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 
@@ -196,7 +226,7 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	tmpf, err := os.CreateTemp("", tempFilePattern)
 	if err != nil {
 		slog.Error("failed to create temporary file", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to create temporary file for upload", http.StatusInternalServerError)
 		return
 	}
 	defer os.Remove(tmpf.Name())
@@ -204,20 +234,39 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		h  = sha1.New()
 		mw = io.MultiWriter(h, tmpf)
 	)
-	n, err := io.Copy(mw, r.Body)
+
+	// Use limited reader if max file size is set
+	var reader io.Reader
+	if svc.MaxFileSize > 0 {
+		reader = &LimitedReader{
+			R:        r.Body,
+			N:        0,
+			MaxBytes: svc.MaxFileSize,
+		}
+	} else {
+		reader = r.Body
+	}
+
+	n, err := io.Copy(mw, reader)
 	if err != nil {
+		// Check if the error is due to file size limit exceeded
+		if svc.MaxFileSize > 0 && strings.Contains(err.Error(), "file size exceeds maximum allowed size") {
+			slog.Warn("file size limit exceeded", "max", svc.MaxFileSize, "err", err)
+			http.Error(w, fmt.Sprintf("File too large (maximum allowed: %d bytes)", svc.MaxFileSize), http.StatusRequestEntityTooLarge)
+			return
+		}
 		slog.Error("failed to drain response body", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 		return
 	}
 	if err := tmpf.Close(); err != nil {
 		slog.Error("failed to close temporary file", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to close temporary file", http.StatusInternalServerError)
 		return
 	}
 	if n != r.ContentLength {
 		slog.Error("content length mismatch", "n", n, "length", r.ContentLength)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Content length mismatch", http.StatusInternalServerError)
 		return
 	}
 	var (
@@ -227,27 +276,27 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	dst, err := svc.shardedPath(digest, true)
 	if err != nil {
 		slog.Error("could not determine sharded path", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to determine file path", http.StatusInternalServerError)
 		return
 	}
 	ok, err = svc.shardedPathExists(digest)
 	if err != nil {
 		slog.Error("could not determine sharded path", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to check if file exists", http.StatusInternalServerError)
 		return
 	}
 	if ok {
 		f, err := os.Open(dst)
 		if err != nil {
 			slog.Error("already uploaded, but file not readable", "err", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, "File exists but not readable", http.StatusInternalServerError)
 			return
 		}
 		defer f.Close()
 		fi, err := f.Stat()
 		if err != nil {
 			slog.Error("failed to stat file", "err", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			http.Error(w, "Failed to get file stats", http.StatusInternalServerError)
 			return
 		}
 		if r.ContentLength == fi.Size() {
@@ -260,7 +309,7 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	if err := os.Rename(tmpf.Name(), dst); err != nil {
 		slog.Error("failed to rename", "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
 	// Optional: persist the URL/SHA1 pair in an sqlite3 database. If no header
