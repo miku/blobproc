@@ -110,11 +110,11 @@ func main() {
 				},
 				Processors: []warcutil.Processor{
 					debugProcessor,
-					// httpPostProcessor,
-					// &warcutil.HashDirProcessor{
-					// 	Dir:       appCacheDir,
-					// 	Extension: ".pdf",
-					// },
+					httpPostProcessor,
+					&warcutil.HashDirProcessor{
+						Dir:       appCacheDir,
+						Extension: ".pdf",
+					},
 				},
 			}
 			if *postURL != "" {
