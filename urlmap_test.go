@@ -14,7 +14,7 @@ func TestURLMap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp db for test: %s", err)
 	}
-	t.Logf(f.Name())
+	t.Logf("%s", f.Name())
 	defer os.Remove(f.Name())
 	u := &URLMap{Path: f.Name()}
 	if err := u.EnsureDB(); err != nil {

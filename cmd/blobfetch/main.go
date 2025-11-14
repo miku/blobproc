@@ -30,10 +30,34 @@ var (
 	// TODO: CDX, item, collection
 )
 
+// extractItemID extracts the item ID from either a full URL or just the ID
+func extractItemID(input string) string {
+	// Check if the input is a full URL
+	if strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "https://") {
+		// Parse the URL to extract the item ID from the path
+		// Expected format: https://archive.org/details/ITEM_ID
+		parts := strings.Split(input, "/")
+		for i, part := range parts {
+			if part == "details" && i+1 < len(parts) {
+				return parts[i+1]
+			}
+		}
+		// If the 'details' path segment is not found, try to get the last segment
+		if len(parts) > 0 {
+			return parts[len(parts)-1]
+		}
+	}
+	// If it's not a URL or we couldn't extract from the URL, return as-is
+	return input
+}
+
 func main() {
 	flag.Parse()
 	switch {
 	case *fromItem != "":
+		// Extract the item ID in case a full URL was provided
+		itemID := extractItemID(*fromItem)
+
 		// prepare cache dir
 		cacheDir, err := os.UserCacheDir()
 		if err != nil {
@@ -44,7 +68,7 @@ func main() {
 			log.Fatal(err)
 		}
 		// ex: https://archive.org/metadata/OPENALEX-CRAWL-2025-09-20251011130616382-07663-07716-wbgrp-crawl047
-		link := fmt.Sprintf("https://archive.org/metadata/%s", *fromItem)
+		link := fmt.Sprintf("https://archive.org/metadata/%s", itemID)
 		log.Printf("fetching: %s", link)
 		resp, err := http.Get(link)
 		if err != nil {
@@ -52,20 +76,20 @@ func main() {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			log.Fatal("%v while fetching %s", resp.StatusCode, link)
+			log.Fatalf("%v while fetching %s", resp.StatusCode, link)
 		}
 		var item ia.Item
 		dec := json.NewDecoder(resp.Body)
 		if err := dec.Decode(&item); err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("found %d files in %s", len(item.Files), *fromItem)
+		log.Printf("found %d files in %s", len(item.Files), itemID)
 		for i, file := range item.Files {
 			if !strings.HasSuffix(file.Name, ".warc.gz") {
 				continue
 			}
 			// https://archive.org/download/OPENALEX-CRAWL-2025-09-20251011130616382-07663-07716-wbgrp-crawl047/OPENALEX-CRAWL-2025-09-20251011144946523-07666-2129926~wbgrp-crawl047.us.archive.org~8443.warc.gz
-			fileURL := fmt.Sprintf("https://archive.org/download/%s/%s", *fromItem, file.Name)
+			fileURL := fmt.Sprintf("https://archive.org/download/%s/%s", itemID, file.Name)
 			resp, err := http.Get(fileURL)
 			if err != nil {
 				log.Fatal(err)
