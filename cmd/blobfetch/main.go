@@ -104,17 +104,16 @@ func main() {
 				log.Println(i, e.StatusCode, e.Size, e.URI)
 				return nil
 			})
-			extractor := warcutil.Extractor{
+			extractor := &warcutil.Extractor{
 				Filters: []warcutil.ResponseFilter{
 					warcutil.PDFResponseFilter,
 				},
 				Processors: []warcutil.Processor{
 					debugProcessor,
-					httpPostProcessor,
-					&warcutil.HashDirProcessor{
-						Dir:       appCacheDir,
-						Extension: ".pdf",
-					},
+					// &warcutil.HashDirProcessor{
+					// 	Dir:       appCacheDir,
+					// 	Extension: ".pdf",
+					// },
 				},
 			}
 			if *postURL != "" {
