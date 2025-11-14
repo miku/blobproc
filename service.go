@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/shirou/gopsutil/v3/disk"
 )
 
 const (
@@ -37,6 +38,8 @@ type WebSpoolService struct {
 	URLMap *URLMap
 	// The HTTP header to look for a URL associated with a pdf blob payload.
 	URLMapHttpHeader string
+	// Minimum required free disk space percentage (default 10%)
+	MinFreeDiskPercent int
 }
 
 // spoolListEntry collects basic information about a spooled file.
@@ -88,6 +91,24 @@ func shardedPathToIdentifier(path string) string {
 	}
 	n := len(parts)
 	return parts[n-3] + parts[n-2] + parts[n-1]
+}
+
+// hasSufficientDiskSpace checks if there is enough free disk space in the service directory.
+func (svc *WebSpoolService) hasSufficientDiskSpace() (bool, error) {
+	// If MinFreeDiskPercent is not set (0), use default of 10%
+	minPercent := svc.MinFreeDiskPercent
+	if minPercent <= 0 {
+		minPercent = 10
+	}
+
+	usage, err := disk.Usage(svc.Dir)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if free space percentage is above the minimum required
+	freePercent := usage.Free * 100 / usage.Total
+	return freePercent >= uint64(minPercent), nil
 }
 
 // SpoolListHandler returns a single, long jsonlines response with information
@@ -156,6 +177,21 @@ func (svc *WebSpoolService) SpoolStatusHandler(w http.ResponseWriter, r *http.Re
 // returns as soon as the file has been written into the spool directory of the
 // service, using a sharded SHA1 as path.
 func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) {
+	// Check if there's sufficient disk space before processing the request
+	ok, err := svc.hasSufficientDiskSpace()
+	if err != nil {
+		slog.Error("failed to check disk space", "err", err, "dir", svc.Dir)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		slog.Warn("insufficient disk space, slowing down request", "dir", svc.Dir)
+		// Return HTTP 429 (Too Many Requests) to signal the client to slow down
+		w.Header().Set("Retry-After", "30") // Suggest retry after 30 seconds
+		w.WriteHeader(http.StatusTooManyRequests)
+		return
+	}
+
 	started := time.Now()
 	tmpf, err := os.CreateTemp("", tempFilePattern)
 	if err != nil {
@@ -194,7 +230,7 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	ok, err := svc.shardedPathExists(digest)
+	ok, err = svc.shardedPathExists(digest)
 	if err != nil {
 		slog.Error("could not determine sharded path", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)

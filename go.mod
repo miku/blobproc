@@ -10,9 +10,11 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
+	github.com/internetarchive/gowarc v0.8.90
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/miku/grobidclient v0.2.3
 	github.com/minio/minio-go/v7 v7.0.94
+	github.com/shirou/gopsutil/v3 v3.23.12
 	github.com/testcontainers/testcontainers-go v0.32.0
 	modernc.org/sqlite v1.38.0
 	mvdan.cc/xurls/v2 v2.6.0
@@ -46,7 +48,6 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/internetarchive/gowarc v0.8.90 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
@@ -72,7 +73,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sethgrid/pester v1.2.0 // indirect
-	github.com/shirou/gopsutil/v3 v3.23.12 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect

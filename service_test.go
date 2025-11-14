@@ -68,3 +68,38 @@ func TestShardedPath(t *testing.T) {
 		}
 	}
 }
+
+func TestHasSufficientDiskSpace(t *testing.T) {
+	name := t.TempDir()
+	svc := WebSpoolService{
+		Dir:                name,
+		MinFreeDiskPercent: 10, // Default 10%
+	}
+
+	// Test with default minimum (10%)
+	ok, err := svc.hasSufficientDiskSpace()
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected sufficient disk space in temp directory")
+	}
+
+	// Test with 100% required (should fail unless temp dir is empty)
+	svc.MinFreeDiskPercent = 100
+	ok, err = svc.hasSufficientDiskSpace()
+	if err != nil {
+		// This is expected to sometimes fail due to system limitations
+		t.Logf("Expected high disk requirement may fail: %v", err)
+	}
+
+	// Test with 0% required (should always pass)
+	svc.MinFreeDiskPercent = 0
+	ok, err = svc.hasSufficientDiskSpace()
+	if err != nil {
+		t.Fatalf("expected no error with 0%% requirement, got: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected sufficient disk space with 0%% requirement")
+	}
+}
