@@ -45,8 +45,8 @@ func TestExtractorBasic(t *testing.T) {
 		"%PDF-1.4 test content",
 	)
 
-	var processed []Extracted
-	processor := FuncProcessor(func(ex Extracted) error {
+	var processed []*Extracted
+	processor := FuncProcessor(func(ex *Extracted) error {
 		// Copy content to avoid reader issues
 		content, _ := io.ReadAll(ex.Content)
 		ex.Content = io.NopCloser(bytes.NewReader(content))
@@ -94,7 +94,7 @@ func TestExtractorWithPDFFilter(t *testing.T) {
 	combined := append(pdfData, htmlData...)
 
 	var processed []string
-	processor := FuncProcessor(func(ex Extracted) error {
+	processor := FuncProcessor(func(ex *Extracted) error {
 		processed = append(processed, ex.URI)
 		return nil
 	})
@@ -138,7 +138,7 @@ func TestExtractorMultipleFilters(t *testing.T) {
 	}
 
 	var processed int
-	processor := FuncProcessor(func(ex Extracted) error {
+	processor := FuncProcessor(func(ex *Extracted) error {
 		processed++
 		return nil
 	})
@@ -177,7 +177,7 @@ func TestDirProcessor(t *testing.T) {
 	}
 
 	testContent := "%PDF-1.4 test content"
-	extracted := Extracted{
+	extracted := &Extracted{
 		URI:         "http://example.com/test.pdf",
 		ContentType: "application/pdf",
 		Content:     io.NopCloser(strings.NewReader(testContent)),
@@ -256,7 +256,7 @@ func TestHttpPostProcessor(t *testing.T) {
 	}
 
 	testContent := "test PDF content"
-	extracted := Extracted{
+	extracted := &Extracted{
 		URI:         "http://example.com/doc.pdf",
 		ContentType: "application/pdf",
 		Content:     io.NopCloser(strings.NewReader(testContent)),
@@ -307,7 +307,7 @@ func TestHttpPostProcessorError(t *testing.T) {
 		Client: mockClient,
 	}
 
-	extracted := Extracted{
+	extracted := &Extracted{
 		URI:         "http://example.com/doc.pdf",
 		ContentType: "application/pdf",
 		Content:     io.NopCloser(strings.NewReader("test")),
@@ -340,7 +340,7 @@ func TestHttpPostProcessorDefaultClient(t *testing.T) {
 		// Client is nil, should use default
 	}
 
-	extracted := Extracted{
+	extracted := &Extracted{
 		URI:         "http://example.com/doc.pdf",
 		ContentType: "application/pdf",
 		Content:     io.NopCloser(strings.NewReader("test")),
@@ -392,7 +392,7 @@ func TestExtractorProcessorError(t *testing.T) {
 	)
 
 	expectedErr := fmt.Errorf("processor error")
-	processor := FuncProcessor(func(ex Extracted) error {
+	processor := FuncProcessor(func(ex *Extracted) error {
 		return expectedErr
 	})
 
@@ -413,7 +413,7 @@ func TestExtractorProcessorError(t *testing.T) {
 // TestExtractorEmptyWARC tests handling of empty WARC files
 func TestExtractorEmptyWARC(t *testing.T) {
 	processed := 0
-	processor := FuncProcessor(func(ex Extracted) error {
+	processor := FuncProcessor(func(ex *Extracted) error {
 		processed++
 		return nil
 	})
@@ -437,7 +437,7 @@ func TestExtractorEmptyWARC(t *testing.T) {
 
 // TestDebugProcessor tests the debug processor
 func TestDebugProcessor(t *testing.T) {
-	extracted := Extracted{
+	extracted := &Extracted{
 		URI:         "http://example.com/test.pdf",
 		ContentType: "application/pdf",
 		Content:     io.NopCloser(strings.NewReader("test")),

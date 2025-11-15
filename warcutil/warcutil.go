@@ -147,7 +147,7 @@ func (h *HttpPostProcessor) Process(ex *Extracted) error {
 	}
 	buf := bytes.Buffer{}
 	if _, err := io.Copy(&buf, ex.Content); err != nil {
-		return err
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 	req, err := http.NewRequest("POST", h.URL, &buf)
 	if err != nil {
@@ -183,7 +183,7 @@ func (e *Extractor) Extract(r io.Reader) error {
 			break
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to read record: %w", err)
 		}
 		uri := record.Header.Get("WARC-Target-URI")
 		if len(uri) == 0 {
@@ -215,20 +215,60 @@ func (e *Extractor) Extract(r io.Reader) error {
 			_ = resp.Body.Close()
 			continue
 		}
-		extracted := &Extracted{
-			URI:         uri,
-			StatusCode:  resp.StatusCode,
-			ContentType: resp.Header.Get("Content-Type"),
-			Content:     resp.Body,
-			Size:        resp.ContentLength,
-			Record:      record,
-		}
-		for _, processor := range e.Processors {
-			if err := processor.Process(extracted); err != nil {
-				return err
+		// If there's only one processor, we can use the original resp.Body directly
+		if len(e.Processors) == 1 {
+			extracted := &Extracted{
+				URI:         uri,
+				StatusCode:  resp.StatusCode,
+				ContentType: resp.Header.Get("Content-Type"),
+				Content:     resp.Body,
+				Size:        resp.ContentLength,
+				Record:      record,
+			}
+			for _, processor := range e.Processors {
+				if err := processor.Process(extracted); err != nil {
+					_ = resp.Body.Close()
+					return err
+				}
+			}
+		} else {
+			// If there are multiple processors, we need to read content and make multiple copies
+			// For now, read into memory with a reasonable limit (e.g., 500MB) for PDF files
+			const maxContentLength = 500 * 1024 * 1024 // 500 MB limit
+			if resp.ContentLength > 0 && resp.ContentLength > maxContentLength {
+				log.Printf("skipping large file %s (%d bytes)", uri, resp.ContentLength)
+				_ = resp.Body.Close()
+				continue
+			}
+
+			contentBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxContentLength+1))
+			if err != nil {
+				_ = resp.Body.Close()
+				continue
+			}
+			_ = resp.Body.Close()
+
+			// Check if content exceeded the limit
+			if int64(len(contentBytes)) > maxContentLength {
+				log.Printf("skipping file %s that exceeded size limit", uri)
+				continue
+			}
+
+			for _, processor := range e.Processors {
+				// Create a new reader for each processor to avoid EOF issues
+				extracted := &Extracted{
+					URI:         uri,
+					StatusCode:  resp.StatusCode,
+					ContentType: resp.Header.Get("Content-Type"),
+					Content:     bytes.NewReader(contentBytes),
+					Size:        int64(len(contentBytes)),
+					Record:      record,
+				}
+				if err := processor.Process(extracted); err != nil {
+					return err
+				}
 			}
 		}
-		_ = resp.Body.Close()
 	}
 	return nil
 }

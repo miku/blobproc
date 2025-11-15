@@ -41,7 +41,7 @@ update-all-deps:
 deb: $(TARGETS)
 	mkdir -p packaging/deb/$(PKGNAME)/usr/local/bin
 	cp $(TARGETS) packaging/deb/$(PKGNAME)/usr/local/bin
-	cd packaging/deb && fakeroot dpkg-deb --build $(PKGNAME) .
+	cd packaging/deb && fakeroot dpkg-deb -Zzstd --build $(PKGNAME) .
 	mv packaging/deb/$(PKGNAME)_*.deb .
 
 
