@@ -133,28 +133,28 @@ func main() {
 		}
 		defer f.Close()
 		var (
-			processor warcutil.Processor
 			extractor = warcutil.Extractor{
 				Filters: []warcutil.ResponseFilter{
 					warcutil.PDFResponseFilter,
 				},
-				Processors: []warcutil.Processor{processor},
+				Processors: []warcutil.Processor{},
 			}
 		)
 		switch {
 		case *outputDir != "":
-			processor = &warcutil.DirProcessor{
+			processor := &warcutil.DirProcessor{
 				Dir:       *outputDir,
 				Prefix:    "blobfetch-",
 				Extension: ".pdf",
 			}
+			extractor.Processors = append(extractor.Processors, processor)
 		case *postURL != "":
-			var httpPostProcessor = &warcutil.HttpPostProcessor{
+			httpPostProcessor := &warcutil.HttpPostProcessor{
 				URL: *postURL,
 			}
 			extractor.Processors = append(extractor.Processors, httpPostProcessor)
 		default:
-			processor = warcutil.DebugProcessor
+			extractor.Processors = append(extractor.Processors, warcutil.DebugProcessor)
 		}
 		if err := extractor.Extract(f); err != nil {
 			log.Fatal(err)
