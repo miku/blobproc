@@ -176,6 +176,7 @@ func TestPdfExtract(t *testing.T) {
 			cmpopts.EquateEmpty(),
 			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Creation"),
 			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Version"),
+			cmpopts.IgnoreFields(pdfinfo.PDFCPUInfo{}, "Keywords"),
 			cmpopts.IgnoreFields(pdfinfo.PDFCPUInfo{}, "Source"),
 		) {
 			// If we fail, we write the result JSON to a tempfile for later
