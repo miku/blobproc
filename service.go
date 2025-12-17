@@ -270,8 +270,9 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var (
-		digest   = fmt.Sprintf("%x", h.Sum(nil))
-		spoolURL = fmt.Sprintf("http://%v/spool/%v", svc.ListenAddr, digest)
+		digest    = fmt.Sprintf("%x", h.Sum(nil))
+		spoolPath = fmt.Sprintf("/spool/%v", digest)
+		spoolURL  = fmt.Sprintf("http://%v%v", svc.ListenAddr, spoolPath)
 	)
 	dst, err := svc.shardedPath(digest, true)
 	if err != nil {
@@ -301,7 +302,7 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		}
 		if r.ContentLength == fi.Size() {
 			slog.Debug("found existing file in spool dir, skipping", "url", spoolURL)
-			w.Header().Add("Location", spoolURL)
+			w.Header().Add("Location", spoolPath)
 			w.WriteHeader(http.StatusAccepted)
 			return
 		}
