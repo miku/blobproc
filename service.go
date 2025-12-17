@@ -210,7 +210,7 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		slog.Warn("insufficient disk space, slowing down request", "dir", svc.Dir)
 		// Return HTTP 429 (Too Many Requests) to signal the client to slow down
-		w.Header().Set("Retry-After", defaultRetryAfterSeconds) // Suggest retry after 30 seconds
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", defaultRetryAfterSeconds)) // Suggest retry after 60 seconds
 		http.Error(w, "insufficient disk space", http.StatusTooManyRequests)
 		return
 	}
