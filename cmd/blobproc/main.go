@@ -210,7 +210,7 @@ func main() {
 			switch {
 			case result.Status != "success":
 				slog.Warn("pdfextract failed", "status", result.Status, "err", result.Err)
-			case len(result.SHA1Hex) != 40:
+			case len(result.SHA1Hex) != blobproc.ExpectedSHA1Length:
 				slog.Warn("invalid sha1 in response", "sha1", result.SHA1Hex)
 			case result.Status == "success":
 				// If we have a thumbnail, save it.

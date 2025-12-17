@@ -20,8 +20,10 @@ import (
 )
 
 const (
-	tempFilePattern         = "blobprocd-*"
-	DefaultURLMapHttpHeader = "X-BLOBPROC-URL"
+	tempFilePattern           = "blobprocd-*"
+	DefaultURLMapHttpHeader   = "X-BLOBPROC-URL"
+	defaultMinFreeDiskPercent = 10
+	ExpectedSHA1Length        = 40
 )
 
 var errShortName = errors.New("short name")
@@ -118,10 +120,10 @@ func shardedPathToIdentifier(path string) string {
 
 // hasSufficientDiskSpace checks if there is enough free disk space in the service directory.
 func (svc *WebSpoolService) hasSufficientDiskSpace() (bool, error) {
-	// If MinFreeDiskPercent is not set (0), use default of 10%
+	// If MinFreeDiskPercent is not set (0), use a default
 	minPercent := svc.MinFreeDiskPercent
 	if minPercent <= 0 {
-		minPercent = 10
+		minPercent = defaultMinFreeDiskPercent
 	}
 
 	usage, err := disk.Usage(svc.Dir)
@@ -180,7 +182,7 @@ func (svc *WebSpoolService) SpoolStatusHandler(w http.ResponseWriter, r *http.Re
 		vars   = mux.Vars(r)
 		digest = vars["id"]
 	)
-	if len(digest) != 40 {
+	if len(digest) != ExpectedSHA1Length {
 		slog.Debug("invalid id", "id", digest)
 		w.WriteHeader(http.StatusBadRequest)
 	} else {

@@ -115,7 +115,7 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 		}
 		req.SHA1Hex = fmt.Sprintf("%x", h.Sum(nil))
 	}
-	if len(req.SHA1Hex) != 40 {
+	if len(req.SHA1Hex) != ExpectedSHA1Length {
 		return nil, ErrInvalidHash
 	}
 	objPath := blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)

@@ -23,6 +23,8 @@ import (
 	"mvdan.cc/xurls/v2"
 )
 
+const minThumbnailSize = 50
+
 var ErrNoData = errors.New("no data")
 
 // FileInfo groups checksum and size for a file. The checksums should all be
@@ -94,7 +96,7 @@ type Result struct {
 
 // HasPage0Thumbnail is a derived property.
 func (result *Result) HasPage0Thumbnail() bool {
-	return len(result.Page0Thumbnail) > 50
+	return len(result.Page0Thumbnail) > minThumbnailSize
 }
 
 func extractWeblinks(s string) (links []string) {
@@ -148,14 +150,14 @@ func extractThumbnailFromPDF(ctx context.Context, filename string, dim Dim, thum
 		prefix          = filename + ".page0.wip"
 		formatFlag, dst string
 	)
-	switch thumbType {
-	case "jpg", "jpeg", "JPEG":
+	switch strings.ToLower(thumbType) {
+	case "jpg", "jpeg":
 		formatFlag = "-jpeg"
 		dst = prefix + ".jpg"
-	case "png", "PNG":
+	case "png":
 		formatFlag = "-png"
 		dst = prefix + ".png"
-	case "tiff", "TIFF":
+	case "tiff":
 		formatFlag = "-tiff"
 		dst = prefix + ".tiff"
 	default:
