@@ -4,8 +4,10 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"io"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -158,7 +160,7 @@ func TestPdfExtract(t *testing.T) {
 			if err := f.Close(); err != nil {
 				t.Fatalf("close: %v", err)
 			}
-			if err := os.Rename(f.Name(), c.snapshot); err != nil {
+			if err := Move(f.Name(), c.snapshot); err != nil {
 				t.Fatalf("rename: %v", err)
 			}
 			t.Logf("created new snapshot: %v", c.snapshot)
@@ -170,7 +172,8 @@ func TestPdfExtract(t *testing.T) {
 		if err := json.Unmarshal(b, &want); err != nil {
 			t.Fatalf("snapshot broken: %v", err)
 		}
-		if !cmp.Equal(result, &want, cmpopts.EquateEmpty(),
+		if !cmp.Equal(result, &want,
+			cmpopts.EquateEmpty(),
 			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Creation"),
 			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Version"),
 			cmpopts.IgnoreFields(pdfinfo.PDFCPUInfo{}, "Source"),
@@ -233,4 +236,41 @@ func BenchmarkPdfExtract(b *testing.B) {
 			ThumbType: "na",
 		})
 	}
+}
+
+func Move(source, destination string) error {
+	err := os.Rename(source, destination)
+	if err != nil && strings.Contains(err.Error(), "invalid cross-device link") {
+		return moveCrossDevice(source, destination)
+	}
+	return err
+}
+
+func moveCrossDevice(source, destination string) error {
+	src, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	dst, err := os.Create(destination)
+	if err != nil {
+		_ = src.Close()
+		return err
+	}
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		return err
+	}
+	_ = src.Close()
+	_ = dst.Close()
+	fi, err := os.Stat(source)
+	if err != nil {
+		_ = os.Remove(destination)
+		return err
+	}
+	err = os.Chmod(destination, fi.Mode())
+	if err != nil {
+		_ = os.Remove(destination)
+		return err
+	}
+	return os.Remove(source)
 }
