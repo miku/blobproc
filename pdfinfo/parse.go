@@ -51,42 +51,44 @@ type PDFCPU struct {
 		Creation string `json:"creation,omitempty"`
 		Version  string `json:"version,omitempty"`
 	} `json:"header,omitempty"`
-	Infos []struct {
-		AppendOnly       bool     `json:"appendOnly,omitempty"`
-		Author           string   `json:"author,omitempty"`
-		Bookmarks        bool     `json:"bookmarks,omitempty"`
-		CreationDate     string   `json:"creationDate,omitempty"`
-		Creator          string   `json:"creator,omitempty"`
-		Encrypted        bool     `json:"encrypted,omitempty"`
-		Form             bool     `json:"form,omitempty"`
-		Hybrid           bool     `json:"hybrid,omitempty"`
-		Keywords         []string `json:"keywords,omitempty"`
-		Linearized       bool     `json:"linearized,omitempty"`
-		ModificationDate string   `json:"modificationDate,omitempty"`
-		Names            bool     `json:"names,omitempty"`
-		PageCount        int64    `json:"pageCount,omitempty"`
-		PageMode         string   `json:"pageMode,omitempty"`
-		PageSizes        []struct {
-			Height float64 `json:"height,omitempty"`
-			Width  float64 `json:"width,omitempty"`
-		} `json:"pageSizes,omitempty"`
-		Permissions int64  `json:"permissions,omitempty"`
-		Producer    string `json:"producer,omitempty"`
-		Properties  struct {
-			PTEXFullbanner string `json:"PTEX.Fullbanner,omitempty"`
-		} `json:"properties,omitempty"`
-		Signatures         bool   `json:"signatures,omitempty"`
-		Source             string `json:"source,omitempty"`
-		Subject            string `json:"subject,omitempty"`
-		Tagged             bool   `json:"tagged,omitempty"`
-		Thumbnails         bool   `json:"thumbnails,omitempty"`
-		Title              string `json:"title,omitempty"`
-		Unit               string `json:"unit,omitempty"`
-		UsingObjectStreams bool   `json:"usingObjectStreams,omitempty"`
-		UsingXRefStreams   bool   `json:"usingXRefStreams,omitempty"`
-		Version            string `json:"version,omitempty"`
-		Watermarked        bool   `json:"watermarked,omitempty"`
-	} `json:"infos,omitempty"`
+	Infos []PDFCPUInfo `json:"infos,omitempty"`
+}
+
+type PDFCPUInfo struct {
+	AppendOnly       bool     `json:"appendOnly,omitempty"`
+	Author           string   `json:"author,omitempty"`
+	Bookmarks        bool     `json:"bookmarks,omitempty"`
+	CreationDate     string   `json:"creationDate,omitempty"`
+	Creator          string   `json:"creator,omitempty"`
+	Encrypted        bool     `json:"encrypted,omitempty"`
+	Form             bool     `json:"form,omitempty"`
+	Hybrid           bool     `json:"hybrid,omitempty"`
+	Keywords         []string `json:"keywords,omitempty"`
+	Linearized       bool     `json:"linearized,omitempty"`
+	ModificationDate string   `json:"modificationDate,omitempty"`
+	Names            bool     `json:"names,omitempty"`
+	PageCount        int64    `json:"pageCount,omitempty"`
+	PageMode         string   `json:"pageMode,omitempty"`
+	PageSizes        []struct {
+		Height float64 `json:"height,omitempty"`
+		Width  float64 `json:"width,omitempty"`
+	} `json:"pageSizes,omitempty"`
+	Permissions int64  `json:"permissions,omitempty"`
+	Producer    string `json:"producer,omitempty"`
+	Properties  struct {
+		PTEXFullbanner string `json:"PTEX.Fullbanner,omitempty"`
+	} `json:"properties,omitempty"`
+	Signatures         bool   `json:"signatures,omitempty"`
+	Source             string `json:"source,omitempty"`
+	Subject            string `json:"subject,omitempty"`
+	Tagged             bool   `json:"tagged,omitempty"`
+	Thumbnails         bool   `json:"thumbnails,omitempty"`
+	Title              string `json:"title,omitempty"`
+	Unit               string `json:"unit,omitempty"`
+	UsingObjectStreams bool   `json:"usingObjectStreams,omitempty"`
+	UsingXRefStreams   bool   `json:"usingXRefStreams,omitempty"`
+	Version            string `json:"version,omitempty"`
+	Watermarked        bool   `json:"watermarked,omitempty"`
 }
 
 // Info is a parsed pdfinfo output.

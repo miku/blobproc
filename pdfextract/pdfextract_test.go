@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/miku/blobproc/pdfinfo"
 )
 
 // TestPdfExtract uses a snapshot style test. If the expected JSON files are
@@ -170,15 +171,19 @@ func TestPdfExtract(t *testing.T) {
 			t.Fatalf("snapshot broken: %v", err)
 		}
 		// PDFCPU fields that change on every run.
-		for _, v := range []*Result{
-			result,
-			&want,
-		} {
-			v.Metadata.PDFCPU.Header.Creation = ""
-			v.Metadata.PDFCPU.Infos[0].Source = ""
-		}
+		// for _, v := range []*Result{
+		// 	result,
+		// 	&want,
+		// } {
+		// 	v.Metadata.PDFCPU.Header.Creation = ""
+		// 	v.Metadata.PDFCPU.Infos[0].Source = ""
+		// }
 		// Remaining fields should be fixed now.
-		if !cmp.Equal(result, &want, cmpopts.EquateEmpty()) {
+		if !cmp.Equal(result, &want, cmpopts.EquateEmpty(),
+			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Creation"),
+			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Version"),
+			cmpopts.IgnoreFields(pdfinfo.PDFCPUInfo{}, "Source"),
+		) {
 			// If we fail, we write the result JSON to a tempfile for later
 			// inspection or snapshot creation.
 			t.Logf("file: %v, snapshot: %v", c.filename, c.snapshot)
