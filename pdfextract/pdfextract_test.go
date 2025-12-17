@@ -170,15 +170,6 @@ func TestPdfExtract(t *testing.T) {
 		if err := json.Unmarshal(b, &want); err != nil {
 			t.Fatalf("snapshot broken: %v", err)
 		}
-		// PDFCPU fields that change on every run.
-		// for _, v := range []*Result{
-		// 	result,
-		// 	&want,
-		// } {
-		// 	v.Metadata.PDFCPU.Header.Creation = ""
-		// 	v.Metadata.PDFCPU.Infos[0].Source = ""
-		// }
-		// Remaining fields should be fixed now.
 		if !cmp.Equal(result, &want, cmpopts.EquateEmpty(),
 			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Creation"),
 			cmpopts.IgnoreFields(Result{}, "Metadata.PDFCPU.Header.Version"),
