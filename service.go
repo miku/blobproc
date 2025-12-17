@@ -23,6 +23,7 @@ const (
 	tempFilePattern           = "blobprocd-*"
 	DefaultURLMapHttpHeader   = "X-BLOBPROC-URL"
 	defaultMinFreeDiskPercent = 10
+	defaultRetryAfterSeconds  = 60
 	ExpectedSHA1Length        = 40
 )
 
@@ -212,8 +213,8 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		slog.Warn("insufficient disk space, slowing down request", "dir", svc.Dir)
 		// Return HTTP 429 (Too Many Requests) to signal the client to slow down
-		w.Header().Set("Retry-After", "30") // Suggest retry after 30 seconds
-		http.Error(w, "Insufficient disk space", http.StatusTooManyRequests)
+		w.Header().Set("Retry-After", defaultRetryAfterSeconds) // Suggest retry after 30 seconds
+		http.Error(w, "insufficient disk space", http.StatusTooManyRequests)
 		return
 	}
 
