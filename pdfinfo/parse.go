@@ -163,7 +163,7 @@ func ParseFile(ctx context.Context, filename string) (*Metadata, error) {
 		return nil, fmt.Errorf("pdfcpu requires an explicit .pdf filename")
 	}
 	if _, err := exec.LookPath("pdfcpu"); err != nil {
-		return nil, fmt.Errorf("missing pdfcpu executable")
+		return nil, fmt.Errorf("missing pdfcpu executable, cf. https://github.com/pdfcpu/pdfcpu")
 	}
 	if _, err := exec.LookPath("pdfinfo"); err != nil {
 		return nil, fmt.Errorf("missing pdfinfo executable")
