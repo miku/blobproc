@@ -104,13 +104,21 @@ func init() {
 	rootCmd.PersistentFlags().String("log-file", "", "log file path (empty = stderr)")
 	rootCmd.PersistentFlags().Duration("timeout", config.DefaultTimeout, "subprocess timeout")
 
+	// S3 flags (global - used by run and single)
+	rootCmd.PersistentFlags().String("s3-endpoint", config.DefaultS3Endpoint, "S3 endpoint")
+	rootCmd.PersistentFlags().String("s3-access-key", config.DefaultS3AccessKey, "S3 access key")
+	rootCmd.PersistentFlags().String("s3-secret-key", config.DefaultS3SecretKey, "S3 secret key")
+	rootCmd.PersistentFlags().String("s3-default-bucket", config.DefaultS3Bucket, "S3 default bucket")
+	rootCmd.PersistentFlags().Bool("s3-use-ssl", config.DefaultS3UseSSL, "use SSL for S3 connections")
+
+	// GROBID flags (global - used by run and single)
+	rootCmd.PersistentFlags().String("grobid-host", config.DefaultGrobidHost, "GROBID host URL")
+	rootCmd.PersistentFlags().Int64("grobid-max-filesize", config.DefaultGrobidMaxSize, "max file size for GROBID in bytes")
+	rootCmd.PersistentFlags().Duration("grobid-timeout", config.DefaultGrobidTimeout, "GROBID request timeout")
+
 	// Run-specific flags
 	runCmd.Flags().IntP("workers", "w", config.DefaultWorkers, "number of parallel workers (1=sequential, >1=parallel)")
 	runCmd.Flags().BoolP("keep", "k", config.DefaultKeepSpool, "keep files in spool after processing")
-
-	// Single-specific flags
-	singleCmd.Flags().String("grobid-host", config.DefaultGrobidHost, "GROBID host URL")
-	singleCmd.Flags().Int64("grobid-max-filesize", config.DefaultGrobidMaxSize, "max file size for GROBID in bytes")
 
 	// Config-specific flags
 	configCmd.Flags().Bool("show-defaults", false, "show default configuration values")
@@ -139,13 +147,21 @@ func initConfig() error {
 	v.BindPFlag("log_file", rootCmd.PersistentFlags().Lookup("log-file"))
 	v.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout"))
 
+	// S3 flags
+	v.BindPFlag("s3.endpoint", rootCmd.PersistentFlags().Lookup("s3-endpoint"))
+	v.BindPFlag("s3.access_key", rootCmd.PersistentFlags().Lookup("s3-access-key"))
+	v.BindPFlag("s3.secret_key", rootCmd.PersistentFlags().Lookup("s3-secret-key"))
+	v.BindPFlag("s3.default_bucket", rootCmd.PersistentFlags().Lookup("s3-default-bucket"))
+	v.BindPFlag("s3.use_ssl", rootCmd.PersistentFlags().Lookup("s3-use-ssl"))
+
+	// GROBID flags
+	v.BindPFlag("grobid.host", rootCmd.PersistentFlags().Lookup("grobid-host"))
+	v.BindPFlag("grobid.max_file_size", rootCmd.PersistentFlags().Lookup("grobid-max-filesize"))
+	v.BindPFlag("grobid.timeout", rootCmd.PersistentFlags().Lookup("grobid-timeout"))
+
 	// Run flags
 	v.BindPFlag("processing.workers", runCmd.Flags().Lookup("workers"))
 	v.BindPFlag("processing.keep_spool", runCmd.Flags().Lookup("keep"))
-
-	// Single flags
-	v.BindPFlag("grobid.host", singleCmd.Flags().Lookup("grobid-host"))
-	v.BindPFlag("grobid.max_file_size", singleCmd.Flags().Lookup("grobid-max-filesize"))
 
 	// Config flags
 	v.BindPFlag("config.show_defaults", configCmd.Flags().Lookup("show-defaults"))
