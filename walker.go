@@ -45,7 +45,7 @@ type WalkFast struct {
 	GrobidMaxFileSize int64
 	Timeout           time.Duration
 	Grobid            *grobidclient.Grobid
-	S3                *WrapS3
+	S3                *BlobStore
 	stats             *WalkStats
 }
 

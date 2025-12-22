@@ -21,22 +21,22 @@ var (
 	DefaultBucket   = "sandcrawler" // DefaultBucket for S3
 )
 
-// WrapS3 slightly wraps I/O around our S3 store with convenience methods.
-type WrapS3 struct {
+// BlobStore slightly wraps I/O around our S3 store with convenience methods.
+type BlobStore struct {
 	Client *minio.Client
 }
 
-// WrapS3Options mostly contains pass through options for minio client.
+// BlobStoreOptions mostly contains pass through options for minio client.
 // Keys from environment, e.g. ...BLOB_ACCESS_KEY
-type WrapS3Options struct {
+type BlobStoreOptions struct {
 	AccessKey     string
 	SecretKey     string
 	DefaultBucket string
 	UseSSL        bool
 }
 
-// NewWrapS3 creates a new, slim wrapper around S3.
-func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
+// NewBlobStore creates a new, slim wrapper around S3.
+func NewBlobStore(endpoint string, opts *BlobStoreOptions) (*BlobStore, error) {
 	client, err := minio.New(endpoint,
 		&minio.Options{
 			// Note: seaweedfs (version 8000GB 1.79 linux amd64) may not work
@@ -57,7 +57,7 @@ func NewWrapS3(endpoint string, opts *WrapS3Options) (*WrapS3, error) {
 	for _, bucket := range buckets {
 		slog.Debug("found bucket", "bucket", bucket.Name)
 	}
-	return &WrapS3{
+	return &BlobStore{
 		Client: client,
 	}, nil
 }
@@ -106,7 +106,7 @@ func blobPath(folder, sha1hex, ext, prefix string) string {
 // options do not contain the SHA1 of the content, it gets computed here.  If
 // no bucket name is given, a default bucket name is used. If the bucket does
 // not exist, if gets created.
-func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutBlobResponse, error) {
+func (bs *BlobStore) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutBlobResponse, error) {
 	if req.SHA1Hex == "" {
 		h := sha1.New()
 		_, err := io.Copy(h, bytes.NewReader(req.Blob))
@@ -122,14 +122,14 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 	if req.Bucket == "" {
 		req.Bucket = DefaultBucket
 	}
-	ok, err := wrap.Client.BucketExists(ctx, req.Bucket)
+	ok, err := bs.Client.BucketExists(ctx, req.Bucket)
 	if err != nil {
 		slog.Error("bucket exist failed", "err", err)
 		return nil, err
 	}
 	if !ok {
 		opts := minio.MakeBucketOptions{}
-		if err := wrap.Client.MakeBucket(ctx, req.Bucket, opts); err != nil {
+		if err := bs.Client.MakeBucket(ctx, req.Bucket, opts); err != nil {
 			slog.Error("make bucket failed", "err", err)
 			return nil, err
 		}
@@ -156,7 +156,7 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 	opts := minio.PutObjectOptions{
 		ContentType: contentType,
 	}
-	info, err := wrap.Client.PutObject(ctx, req.Bucket, objPath,
+	info, err := bs.Client.PutObject(ctx, req.Bucket, objPath,
 		bytes.NewReader(req.Blob), int64(len(req.Blob)), opts)
 	if err != nil {
 		slog.Error("put object failed", "err", err)
@@ -175,12 +175,12 @@ func (wrap *WrapS3) PutBlob(ctx context.Context, req *BlobRequestOptions) (*PutB
 }
 
 // GetBlob returns the object bytes given a blob request.
-func (wrap *WrapS3) GetBlob(ctx context.Context, req *BlobRequestOptions) ([]byte, error) {
+func (bs *BlobStore) GetBlob(ctx context.Context, req *BlobRequestOptions) ([]byte, error) {
 	objPath := blobPath(req.Folder, req.SHA1Hex, req.Ext, req.Prefix)
 	if req.Bucket == "" {
 		req.Bucket = DefaultBucket
 	}
-	object, err := wrap.Client.GetObject(ctx, req.Bucket, objPath, minio.GetObjectOptions{})
+	object, err := bs.Client.GetObject(ctx, req.Bucket, objPath, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err
 	}

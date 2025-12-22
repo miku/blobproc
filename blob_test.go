@@ -111,7 +111,7 @@ func TestPutGetObject(t *testing.T) {
 		hostPort = fmt.Sprintf("0.0.0.0:9000")
 		t.Logf("starting e2e test, using local minio running at %v", hostPort)
 	}
-	wrap, err := NewWrapS3(hostPort, &WrapS3Options{
+	blobStore, err := NewBlobStore(hostPort, &BlobStoreOptions{
 		AccessKey:     "minioadmin",
 		SecretKey:     "minioadmin",
 		DefaultBucket: "default",
@@ -167,7 +167,7 @@ func TestPutGetObject(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		resp, err := wrap.PutBlob(context.TODO(), c.opts)
+		resp, err := blobStore.PutBlob(context.TODO(), c.opts)
 		if err != nil {
 			t.Fatalf("PutBlob failed: %v", err)
 		}
@@ -177,7 +177,7 @@ func TestPutGetObject(t *testing.T) {
 			t.Logf("successfully saved blob: %v", resp.ObjectPath)
 		}
 		// c.opts will have the SHA1 field amended, hacky, because invisible
-		b, err := wrap.GetBlob(context.TODO(), c.opts)
+		b, err := blobStore.GetBlob(context.TODO(), c.opts)
 		if err != nil {
 			t.Fatalf("GetBlob failed: %v", err)
 		}

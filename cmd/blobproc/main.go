@@ -230,11 +230,11 @@ func ensureSpoolDir() error {
 
 // setupServices initializes GROBID and S3 clients; returns nil clients if
 // services are unavailable for graceful degradation
-func setupServices() (*grobidclient.Grobid, *blobproc.WrapS3) {
+func setupServices() (*grobidclient.Grobid, *blobproc.BlobStore) {
 	var (
-		grobid *grobidclient.Grobid = grobidclient.New(cfg.Grobid.Host)
-		wrapS3 *blobproc.WrapS3
-		s3opts = &blobproc.WrapS3Options{
+		grobid        *grobidclient.Grobid = grobidclient.New(cfg.Grobid.Host)
+		blobStore     *blobproc.BlobStore
+		blobStoreOpts = &blobproc.BlobStoreOptions{
 			AccessKey:     strings.TrimSpace(cfg.S3.AccessKey),
 			SecretKey:     strings.TrimSpace(cfg.S3.SecretKey),
 			DefaultBucket: cfg.S3.DefaultBucket,
@@ -243,14 +243,14 @@ func setupServices() (*grobidclient.Grobid, *blobproc.WrapS3) {
 		err error
 	)
 	slog.Info("grobid client", "host", cfg.Grobid.Host)
-	wrapS3, err = blobproc.NewWrapS3(cfg.S3.Endpoint, s3opts)
+	blobStore, err = blobproc.NewBlobStore(cfg.S3.Endpoint, blobStoreOpts)
 	if err != nil {
 		slog.Warn("cannot initialize S3 client, S3 operations will be skipped", "err", err, "endpoint", cfg.S3.Endpoint)
-		wrapS3 = nil
+		blobStore = nil
 	} else {
-		slog.Info("s3 wrapper", "endpoint", cfg.S3.Endpoint)
+		slog.Info("blobstroe (s3)", "endpoint", cfg.S3.Endpoint)
 	}
-	return grobid, wrapS3
+	return grobid, blobStore
 }
 
 func runSequentialProcessor() error {
@@ -262,7 +262,7 @@ func runSequentialProcessor() error {
 	if err := ensureSpoolDir(); err != nil {
 		return err
 	}
-	grobid, wrapS3 := setupServices()
+	grobid, blobStore := setupServices()
 	started := time.Now()
 	var stats struct {
 		NumFiles   int
@@ -297,7 +297,7 @@ func runSequentialProcessor() error {
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 		defer cancel()
-		if err := processSingleFile(ctx, path, info.Size(), grobid, wrapS3); err != nil {
+		if err := processSingleFile(ctx, path, info.Size(), grobid, blobStore); err != nil {
 			slog.Warn("processing failed", "err", err, "path", path)
 			return nil // Continue with other files
 		}
@@ -327,7 +327,7 @@ func runParallelProcessor() error {
 	if err := ensureSpoolDir(); err != nil {
 		return err
 	}
-	grobid, wrapS3 := setupServices()
+	grobid, blobStore := setupServices()
 	walker := blobproc.WalkFast{
 		Dir:               cfg.SpoolDir,
 		NumWorkers:        cfg.Processing.Workers,
@@ -335,12 +335,12 @@ func runParallelProcessor() error {
 		GrobidMaxFileSize: cfg.Grobid.MaxFileSize,
 		Timeout:           cfg.Timeout,
 		Grobid:            grobid,
-		S3:                wrapS3,
+		S3:                blobStore,
 	}
 	return walker.Run(context.Background())
 }
 
-func processSingleFile(ctx context.Context, path string, size int64, grobid *grobidclient.Grobid, wrapS3 *blobproc.WrapS3) error {
+func processSingleFile(ctx context.Context, path string, size int64, grobid *grobidclient.Grobid, blobStore *blobproc.BlobStore) error {
 	result := pdfextract.ProcessFile(ctx, path, &pdfextract.Options{
 		Dim:       pdfextract.Dim{180, 300},
 		ThumbType: "JPEG",
@@ -353,7 +353,7 @@ func processSingleFile(ctx context.Context, path string, size int64, grobid *gro
 	case result.Status == "success":
 		if result.HasPage0Thumbnail() {
 			switch {
-			case wrapS3 == nil:
+			case blobStore == nil:
 				slog.Debug("skipping S3 put (thumbnail), S3 client not available", "sha1", result.SHA1Hex)
 			default:
 				opts := blobproc.BlobRequestOptions{
@@ -364,7 +364,7 @@ func processSingleFile(ctx context.Context, path string, size int64, grobid *gro
 					Ext:     "180px.jpg",
 					Prefix:  "",
 				}
-				resp, err := wrapS3.PutBlob(ctx, &opts)
+				resp, err := blobStore.PutBlob(ctx, &opts)
 				if err != nil {
 					slog.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
 				} else {
@@ -374,7 +374,7 @@ func processSingleFile(ctx context.Context, path string, size int64, grobid *gro
 		}
 		if len(result.Text) > 0 {
 			switch {
-			case wrapS3 == nil:
+			case blobStore == nil:
 				slog.Debug("skipping S3 put (text), S3 client not available", "sha1", result.SHA1Hex)
 			default:
 				opts := blobproc.BlobRequestOptions{
@@ -385,7 +385,7 @@ func processSingleFile(ctx context.Context, path string, size int64, grobid *gro
 					Ext:     "txt",
 					Prefix:  "",
 				}
-				resp, err := wrapS3.PutBlob(ctx, &opts)
+				resp, err := blobStore.PutBlob(ctx, &opts)
 				if err != nil {
 					slog.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
 				} else {
@@ -416,7 +416,7 @@ func processSingleFile(ctx context.Context, path string, size int64, grobid *gro
 		slog.Warn("grobid failed", "err", err)
 	default:
 		switch {
-		case wrapS3 == nil:
+		case blobStore == nil:
 			slog.Debug("skipping S3 put (grobid), S3 client not available", "sha1", gres.SHA1Hex)
 		default:
 			opts := blobproc.BlobRequestOptions{
@@ -427,7 +427,7 @@ func processSingleFile(ctx context.Context, path string, size int64, grobid *gro
 				Ext:     "tei.xml",
 				Prefix:  "",
 			}
-			resp, err := wrapS3.PutBlob(ctx, &opts)
+			resp, err := blobStore.PutBlob(ctx, &opts)
 			if err != nil {
 				slog.Error("s3 failed (grobid)", "err", err)
 				return err
