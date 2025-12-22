@@ -82,41 +82,36 @@ Usage of blobprocd:
 Processing command line tool.
 
 ```
-$ blobproc -h
-blobproc - process and persist PDF derivatives
+$ blobproc --help
+BLOBPROC is a PDF postprocessing utility that generates derivatives
+like fulltext, thumbnails, and metadata from PDF files and can persist them to S3.
 
-Emit JSON with locally extracted data:
+Examples:
+  blobproc run                    # Process files from spool directory (sequential)
+  blobproc run -w 4               # Process with 4 parallel workers
+  blobproc single file.pdf        # Process single file for testing
+  blobproc config                 # Show current configuration
 
-  $ blobproc -f file.pdf | jq .
+Usage:
+  blobproc [command]
 
-Flags
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  config      Show current configuration
+  help        Help about any command
+  run         Process files from spool directory
+  single      Process a single file for testing
 
-  -P    run processing in parallel (exp)
-  -T duration
-        subprocess timeout (default 5m0s)
-  -debug
-        more verbose output
-  -f string
-        process a single file (local tools only), for testing
-  -grobid-host string
-        grobid host, cf. https://is.gd/3wnssq (default "http://localhost:8070")
-  -grobid-max-filesize int
-        max file size to send to grobid in bytes (default 268435456)
-  -k    keep files in spool after processing, mainly for debugging
-  -logfile string
-        structured log output file, stderr if empty
-  -s3-access-key string
-        S3 access key (default "minioadmin")
-  -s3-endpoint string
-        S3 endpoint (default "localhost:9000")
-  -s3-secret-key string
-        S3 secret key (default "minioadmin")
-  -spool string
-         (default "/home/tir/.local/share/blobproc/spool")
-  -version
-        show version
-  -w int
-        number of parallel workers (default 4)
+Flags:
+      --config string      config file (searches: ./blobproc.yaml, /home/tir/.config/blobproc/blobproc.yaml, /etc/blobproc/blobproc.yaml)
+      --debug              enable debug logging
+  -h, --help               help for blobproc
+      --log-file string    log file path (empty = stderr)
+      --spool-dir string   spool directory path (default "/home/tir/.local/share/blobproc/spool")
+      --timeout duration   subprocess timeout (default 5m0s)
+  -v, --version            version for blobproc
+
+Use "blobproc [command] --help" for more information about a command.
 ```
 
 ## Performance data points

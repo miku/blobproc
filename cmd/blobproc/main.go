@@ -98,7 +98,7 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 
 	// Global flags (using hardcoded defaults - use 'blobproc config' to see effective values)
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/blobproc/blobproc.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("config file (searches: ./blobproc.yaml, %s/.config/blobproc/blobproc.yaml, /etc/blobproc/blobproc.yaml)", os.Getenv("HOME")))
 	rootCmd.PersistentFlags().Bool("debug", config.DefaultDebug, "enable debug logging")
 	rootCmd.PersistentFlags().String("spool-dir", config.DefaultSpoolDir, "spool directory path")
 	rootCmd.PersistentFlags().String("log-file", "", "log file path (empty = stderr)")
