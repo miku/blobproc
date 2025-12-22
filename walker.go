@@ -98,43 +98,56 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 				case result.Status == "success":
 					// If we have a thumbnail, save it.
 					if result.HasPage0Thumbnail() {
-						opts := BlobRequestOptions{
-							Bucket:  "thumbnail",
-							Folder:  "pdf",
-							Blob:    result.Page0Thumbnail,
-							SHA1Hex: result.SHA1Hex,
-							Ext:     "180px.jpg",
-							Prefix:  "",
-						}
-						resp, err := w.S3.PutBlob(ctx, &opts)
-						if err != nil {
-							logger.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
-							errors = append(errors, fmt.Errorf("s3 failed (thumbnail): %v", result.SHA1Hex))
+						if w.S3 == nil {
+							logger.Debug("skipping S3 put (thumbnail), S3 client not available", "sha1", result.SHA1Hex)
 						} else {
-							logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+							opts := BlobRequestOptions{
+								Bucket:  "thumbnail",
+								Folder:  "pdf",
+								Blob:    result.Page0Thumbnail,
+								SHA1Hex: result.SHA1Hex,
+								Ext:     "180px.jpg",
+								Prefix:  "",
+							}
+							resp, err := w.S3.PutBlob(ctx, &opts)
+							if err != nil {
+								logger.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
+								errors = append(errors, fmt.Errorf("s3 failed (thumbnail): %v", result.SHA1Hex))
+							} else {
+								logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+							}
 						}
 					}
 					// If we have some text, save it.
 					if len(result.Text) > 0 {
-						opts := BlobRequestOptions{
-							Bucket:  "sandcrawler",
-							Folder:  "text",
-							Blob:    []byte(result.Text),
-							SHA1Hex: result.SHA1Hex,
-							Ext:     "txt",
-							Prefix:  "",
-						}
-						resp, err := w.S3.PutBlob(ctx, &opts)
-						if err != nil {
-							logger.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
-							errors = append(errors, fmt.Errorf("s3 failed (text): %v", result.SHA1Hex))
+						if w.S3 == nil {
+							logger.Debug("skipping S3 put (text), S3 client not available", "sha1", result.SHA1Hex)
 						} else {
-							logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+							opts := BlobRequestOptions{
+								Bucket:  "sandcrawler",
+								Folder:  "text",
+								Blob:    []byte(result.Text),
+								SHA1Hex: result.SHA1Hex,
+								Ext:     "txt",
+								Prefix:  "",
+							}
+							resp, err := w.S3.PutBlob(ctx, &opts)
+							if err != nil {
+								logger.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
+								errors = append(errors, fmt.Errorf("s3 failed (text): %v", result.SHA1Hex))
+							} else {
+								logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+							}
 						}
 					}
 				}
+				// Skip GROBID if client not available
+				if w.Grobid == nil {
+					logger.Debug("skipping GROBID processing, GROBID client not available", "path", path)
+					return
+				}
 				if payload.FileInfo.Size() > w.GrobidMaxFileSize {
-					logger.Warn("skipping too large file", "path", path, "size", payload.FileInfo.Size())
+					logger.Warn("skipping too large file for GROBID", "path", path, "size", payload.FileInfo.Size())
 					return
 				}
 				// Structured metadata from PDF via grobid
@@ -144,7 +157,7 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 					ConsolidateHeader:      true,
 					ConsolidateCitations:   false, // "too expensive for now"
 					IncludeRawCitations:    true,
-					IncluseRawAffiliations: true,
+					IncludeRawAffiliations: true,
 					TEICoordinates:         []string{"ref", "figure", "persName", "formula", "biblStruct"},
 					SegmentSentences:       true,
 				})
@@ -153,20 +166,24 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 					logger.Warn("grobid failed", "err", err)
 					return
 				default:
-					opts := BlobRequestOptions{
-						Bucket:  "sandcrawler",
-						Folder:  "grobid",
-						Blob:    gres.Body,
-						SHA1Hex: gres.SHA1Hex,
-						Ext:     "tei.xml",
-						Prefix:  "",
-					}
-					resp, err := w.S3.PutBlob(ctx, &opts)
-					if err != nil {
-						logger.Error("s3 failed (tei)", "err", err)
-						errors = append(errors, fmt.Errorf("s3 failed (tei): %v", err))
+					if w.S3 == nil {
+						logger.Debug("skipping S3 put (grobid), S3 client not available", "sha1", gres.SHA1Hex)
 					} else {
-						logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+						opts := BlobRequestOptions{
+							Bucket:  "sandcrawler",
+							Folder:  "grobid",
+							Blob:    gres.Body,
+							SHA1Hex: gres.SHA1Hex,
+							Ext:     "tei.xml",
+							Prefix:  "",
+						}
+						resp, err := w.S3.PutBlob(ctx, &opts)
+						if err != nil {
+							logger.Error("s3 failed (tei)", "err", err)
+							errors = append(errors, fmt.Errorf("s3 failed (tei): %v", err))
+						} else {
+							logger.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+						}
 					}
 				}
 				if len(errors) == 0 {
@@ -191,10 +208,10 @@ func (w *WalkFast) worker(wctx context.Context, workerName string, queue chan Pa
 // workers as we do not have a constructor function.
 func (w *WalkFast) Run(ctx context.Context) error {
 	if w.Grobid == nil {
-		return fmt.Errorf("walker needs grobid setup")
+		slog.Warn("GROBID client not available, GROBID processing will be skipped")
 	}
 	if w.S3 == nil {
-		return fmt.Errorf("walker needs S3")
+		slog.Warn("S3 client not available, S3 uploads will be skipped")
 	}
 	w.stats = new(WalkStats)
 	var queue = make(chan Payload)

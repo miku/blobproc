@@ -2,12 +2,29 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/spf13/viper"
+)
+
+// Default values - single source of truth
+var (
+	DefaultSpoolDir        = filepath.Join(xdg.DataHome, "blobproc", "spool")
+	DefaultTimeout         = 5 * time.Minute
+	DefaultGrobidHost      = "http://localhost:8070"
+	DefaultGrobidMaxSize   = int64(256 * 1024 * 1024) // 256MB
+	DefaultGrobidTimeout   = 30 * time.Second
+	DefaultS3Endpoint      = "localhost:9000"
+	DefaultS3AccessKey     = "minioadmin"
+	DefaultS3SecretKey     = "minioadmin"
+	DefaultS3Bucket        = "sandcrawler"
+	DefaultS3UseSSL        = false
+	DefaultWorkers         = 4
+	DefaultKeepSpool       = false
+	DefaultDebug           = false
 )
 
 type Config struct {
@@ -43,7 +60,6 @@ type GrobidConfig struct {
 
 type ProcessingConfig struct {
 	Workers   int  `mapstructure:"workers"`
-	Parallel  bool `mapstructure:"parallel"`
 	KeepSpool bool `mapstructure:"keep_spool"`
 }
 
@@ -53,9 +69,8 @@ func Init() (*viper.Viper, error) {
 	// Set defaults
 	setDefaults(v)
 
-	// Config file search paths
+	// Config file search paths (viper auto-detects .yaml/.yml extension)
 	v.SetConfigName("blobproc")
-	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.config/blobproc")
 	v.AddConfigPath("/etc/blobproc")
@@ -63,13 +78,18 @@ func Init() (*viper.Viper, error) {
 	// Environment variable prefix
 	v.SetEnvPrefix("BLOBPROC")
 	v.AutomaticEnv()
+	// Replace dots with underscores in config keys for environment variable mapping
+	// This allows s3.endpoint -> BLOBPROC_S3_ENDPOINT, processing.workers -> BLOBPROC_PROCESSING_WORKERS, etc.
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Read config file if exists
+	// Try to read config file
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			// If there's a config file but it's malformed, warn and continue with defaults
-			fmt.Fprintf(os.Stderr, "Warning: error reading config file: %v (using defaults)\n", err)
+		// If no config file found, that's perfectly fine - continue silently
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			return v, nil
 		}
+		// Config file exists but is broken - fail fast and tell user which file
+		return nil, fmt.Errorf("error parsing config file %s: %w", v.ConfigFileUsed(), err)
 	}
 
 	return v, nil
@@ -77,24 +97,23 @@ func Init() (*viper.Viper, error) {
 
 func setDefaults(v *viper.Viper) {
 	// Common defaults
-	v.SetDefault("debug", false)
-	v.SetDefault("spool_dir", path.Join(xdg.DataHome, "blobproc", "spool"))
-	v.SetDefault("timeout", "5m")
+	v.SetDefault("debug", DefaultDebug)
+	v.SetDefault("spool_dir", DefaultSpoolDir)
+	v.SetDefault("timeout", DefaultTimeout)
 
 	// S3 defaults
-	v.SetDefault("s3.endpoint", "localhost:9000")
-	v.SetDefault("s3.access_key", "minioadmin")
-	v.SetDefault("s3.secret_key", "minioadmin")
-	v.SetDefault("s3.default_bucket", "sandcrawler")
-	v.SetDefault("s3.use_ssl", false)
+	v.SetDefault("s3.endpoint", DefaultS3Endpoint)
+	v.SetDefault("s3.access_key", DefaultS3AccessKey)
+	v.SetDefault("s3.secret_key", DefaultS3SecretKey)
+	v.SetDefault("s3.default_bucket", DefaultS3Bucket)
+	v.SetDefault("s3.use_ssl", DefaultS3UseSSL)
 
 	// GROBID defaults
-	v.SetDefault("grobid.host", "http://localhost:8070")
-	v.SetDefault("grobid.max_file_size", 256*1024*1024) // 256MB
-	v.SetDefault("grobid.timeout", "30s")
+	v.SetDefault("grobid.host", DefaultGrobidHost)
+	v.SetDefault("grobid.max_file_size", DefaultGrobidMaxSize)
+	v.SetDefault("grobid.timeout", DefaultGrobidTimeout)
 
 	// Processing defaults
-	v.SetDefault("processing.workers", 4)
-	v.SetDefault("processing.parallel", false)
-	v.SetDefault("processing.keep_spool", false)
+	v.SetDefault("processing.workers", DefaultWorkers)
+	v.SetDefault("processing.keep_spool", DefaultKeepSpool)
 }

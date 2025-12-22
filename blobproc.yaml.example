@@ -1,4 +1,4 @@
-# BLOBPROC Configuration
+# Example BLOBPROC Configuration
 
 debug: true
 spool_dir: "/tmp/blobproc-spool"
@@ -18,5 +18,4 @@ grobid:
 
 processing:
   workers: 8
-  parallel: true
   keep_spool: true

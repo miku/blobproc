@@ -30,18 +30,15 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "blobproc",
 	Short: "Process and persist PDF derivatives",
-	Long: `BLOBPROC is a PDF postprocessing system that generates
-derivatives like fulltext, thumbnails, and metadata from PDF files.
+	Long: `BLOBPROC is a PDF postprocessing utility that generates derivatives
+like fulltext, thumbnails, and metadata from PDF files and can persist them to S3.
 
 Examples:
-  blobproc run                    # Process files from spool directory
-  blobproc run -P                 # Process in parallel mode
+  blobproc run                    # Process files from spool directory (sequential)
+  blobproc run -w 4               # Process with 4 parallel workers
   blobproc single file.pdf        # Process single file for testing
   blobproc config                 # Show current configuration`,
 	Version: blobproc.Version,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		return initConfig()
-	},
 }
 
 // Run command - process files from spool
@@ -90,54 +87,34 @@ func Execute() {
 }
 
 func init() {
+	// Set up the PersistentPreRunE hook (must be done here to avoid initialization cycle)
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		return initConfig()
+	}
+
 	// Add subcommands
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(singleCmd)
 	rootCmd.AddCommand(configCmd)
 
-	// Global flags
+	// Global flags (using hardcoded defaults - use 'blobproc config' to see effective values)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/blobproc/blobproc.yaml)")
-	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
-	rootCmd.PersistentFlags().String("spool-dir", "", "spool directory path")
-	rootCmd.PersistentFlags().String("log-file", "", "log file path")
-	rootCmd.PersistentFlags().Duration("timeout", 0, "subprocess timeout")
+	rootCmd.PersistentFlags().Bool("debug", config.DefaultDebug, "enable debug logging")
+	rootCmd.PersistentFlags().String("spool-dir", config.DefaultSpoolDir, "spool directory path")
+	rootCmd.PersistentFlags().String("log-file", "", "log file path (empty = stderr)")
+	rootCmd.PersistentFlags().Duration("timeout", config.DefaultTimeout, "subprocess timeout")
 
 	// Run-specific flags
-	runCmd.Flags().IntP("workers", "w", 0, "number of parallel workers")
-	runCmd.Flags().BoolP("parallel", "P", false, "run processing in parallel")
-	runCmd.Flags().BoolP("keep", "k", false, "keep files in spool after processing")
+	runCmd.Flags().IntP("workers", "w", config.DefaultWorkers, "number of parallel workers (1=sequential, >1=parallel)")
+	runCmd.Flags().BoolP("keep", "k", config.DefaultKeepSpool, "keep files in spool after processing")
 
 	// Single-specific flags
-	singleCmd.Flags().String("grobid-host", "", "GROBID host URL")
-	singleCmd.Flags().Int64("grobid-max-filesize", 0, "max file size for GROBID in bytes")
+	singleCmd.Flags().String("grobid-host", config.DefaultGrobidHost, "GROBID host URL")
+	singleCmd.Flags().Int64("grobid-max-filesize", config.DefaultGrobidMaxSize, "max file size for GROBID in bytes")
 
 	// Config-specific flags
 	configCmd.Flags().Bool("show-defaults", false, "show default configuration values")
 	configCmd.Flags().Bool("show-file", false, "show config file location")
-
-	// Bind all flags to viper
-	bindFlags()
-}
-
-func bindFlags() {
-	// Global flags
-	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
-	viper.BindPFlag("spool_dir", rootCmd.PersistentFlags().Lookup("spool-dir"))
-	viper.BindPFlag("log_file", rootCmd.PersistentFlags().Lookup("log-file"))
-	viper.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout"))
-
-	// Run flags
-	viper.BindPFlag("processing.workers", runCmd.Flags().Lookup("workers"))
-	viper.BindPFlag("processing.parallel", runCmd.Flags().Lookup("parallel"))
-	viper.BindPFlag("processing.keep_spool", runCmd.Flags().Lookup("keep"))
-
-	// Single flags
-	viper.BindPFlag("grobid.host", singleCmd.Flags().Lookup("grobid-host"))
-	viper.BindPFlag("grobid.max_file_size", singleCmd.Flags().Lookup("grobid-max-filesize"))
-
-	// Config flags
-	viper.BindPFlag("config.show_defaults", configCmd.Flags().Lookup("show-defaults"))
-	viper.BindPFlag("config.show_file", configCmd.Flags().Lookup("show-file"))
 }
 
 func initConfig() error {
@@ -154,6 +131,25 @@ func initConfig() error {
 			return fmt.Errorf("error reading config file: %w", err)
 		}
 	}
+
+	// Bind command-line flags to viper instance (must be done after viper is created)
+	// Global flags
+	v.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	v.BindPFlag("spool_dir", rootCmd.PersistentFlags().Lookup("spool-dir"))
+	v.BindPFlag("log_file", rootCmd.PersistentFlags().Lookup("log-file"))
+	v.BindPFlag("timeout", rootCmd.PersistentFlags().Lookup("timeout"))
+
+	// Run flags
+	v.BindPFlag("processing.workers", runCmd.Flags().Lookup("workers"))
+	v.BindPFlag("processing.keep_spool", runCmd.Flags().Lookup("keep"))
+
+	// Single flags
+	v.BindPFlag("grobid.host", singleCmd.Flags().Lookup("grobid-host"))
+	v.BindPFlag("grobid.max_file_size", singleCmd.Flags().Lookup("grobid-max-filesize"))
+
+	// Config flags
+	v.BindPFlag("config.show_defaults", configCmd.Flags().Lookup("show-defaults"))
+	v.BindPFlag("config.show_file", configCmd.Flags().Lookup("show-file"))
 
 	// Unmarshal config
 	if err := v.Unmarshal(&cfg); err != nil {
@@ -184,7 +180,6 @@ func setupLogging() {
 			slog.Error("cannot open log", "err", err)
 			os.Exit(1)
 		}
-		defer f.Close()
 		w = f
 	default:
 		w = os.Stderr
@@ -197,10 +192,49 @@ func setupLogging() {
 
 // Command implementations
 func runProcessor() error {
-	if cfg.Processing.Parallel {
+	if cfg.Processing.Workers > 1 {
 		return runParallelProcessor()
 	}
 	return runSequentialProcessor()
+}
+
+// ensureSpoolDir creates the spool directory if it doesn't exist
+func ensureSpoolDir() error {
+	if cfg.SpoolDir == "" {
+		return fmt.Errorf("spool directory not configured")
+	}
+	if _, err := os.Stat(cfg.SpoolDir); os.IsNotExist(err) {
+		slog.Info("creating spool directory", "path", cfg.SpoolDir)
+		if err := os.MkdirAll(cfg.SpoolDir, 0755); err != nil {
+			return fmt.Errorf("cannot create spool directory: %w", err)
+		}
+	}
+	return nil
+}
+
+// setupServices initializes GROBID and S3 clients; returns nil clients if
+// services are unavailable for graceful degradation
+func setupServices() (*grobidclient.Grobid, *blobproc.WrapS3) {
+	var (
+		grobid *grobidclient.Grobid = grobidclient.New(cfg.Grobid.Host)
+		wrapS3 *blobproc.WrapS3
+		s3opts = &blobproc.WrapS3Options{
+			AccessKey:     strings.TrimSpace(cfg.S3.AccessKey),
+			SecretKey:     strings.TrimSpace(cfg.S3.SecretKey),
+			DefaultBucket: cfg.S3.DefaultBucket,
+			UseSSL:        cfg.S3.UseSSL,
+		}
+		err error
+	)
+	slog.Info("grobid client", "host", cfg.Grobid.Host)
+	wrapS3, err = blobproc.NewWrapS3(cfg.S3.Endpoint, s3opts)
+	if err != nil {
+		slog.Warn("cannot initialize S3 client, S3 operations will be skipped", "err", err, "endpoint", cfg.S3.Endpoint)
+		wrapS3 = nil
+	} else {
+		slog.Info("s3 wrapper", "endpoint", cfg.S3.Endpoint)
+	}
+	return grobid, wrapS3
 }
 
 func runSequentialProcessor() error {
@@ -209,33 +243,17 @@ func runSequentialProcessor() error {
 		"workers", cfg.Processing.Workers,
 		"keep_spool", cfg.Processing.KeepSpool)
 
-	// Setup external services
-	grobid := grobidclient.New(cfg.Grobid.Host)
-	slog.Info("grobid client", "host", cfg.Grobid.Host)
-
-	s3opts := &blobproc.WrapS3Options{
-		AccessKey:     strings.TrimSpace(cfg.S3.AccessKey),
-		SecretKey:     strings.TrimSpace(cfg.S3.SecretKey),
-		DefaultBucket: cfg.S3.DefaultBucket,
-		UseSSL:        cfg.S3.UseSSL,
+	if err := ensureSpoolDir(); err != nil {
+		return err
 	}
-
-	wrapS3, err := blobproc.NewWrapS3(cfg.S3.Endpoint, s3opts)
-	if err != nil {
-		slog.Error("cannot access S3", "err", err)
-		return fmt.Errorf("cannot access S3: %w", err)
-	}
-	slog.Info("s3 wrapper", "endpoint", cfg.S3.Endpoint)
-
-	// Spool walk
+	grobid, wrapS3 := setupServices()
 	started := time.Now()
 	var stats struct {
 		NumFiles   int
 		NumOK      int
 		NumSkipped int
 	}
-
-	err = filepath.Walk(cfg.SpoolDir, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(cfg.SpoolDir, func(path string, info fs.FileInfo, err error) error {
 		stats.NumFiles++
 		if err != nil {
 			return err
@@ -249,10 +267,7 @@ func runSequentialProcessor() error {
 			slog.Warn("skipping empty file", "path", path)
 			return nil
 		}
-
 		slog.Debug("processing", "path", path)
-
-		// Handle file cleanup
 		defer func() {
 			if !cfg.Processing.KeepSpool {
 				if _, err := os.Stat(path); err == nil {
@@ -264,26 +279,20 @@ func runSequentialProcessor() error {
 				slog.Debug("keeping file in spool", "path", path)
 			}
 		}()
-
 		ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 		defer cancel()
-
-		// Process file using existing logic
 		if err := processSingleFile(ctx, path, info.Size(), grobid, wrapS3); err != nil {
 			slog.Warn("processing failed", "err", err, "path", path)
 			return nil // Continue with other files
 		}
-
 		stats.NumOK++
 		slog.Debug("processing finished successfully", "path", path)
 		return nil
 	})
-
 	if err != nil {
 		slog.Error("walk failed", "err", err)
 		return err
 	}
-
 	slog.Info("directory walk done",
 		"duration", time.Since(started),
 		"duration_str", time.Since(started).String(),
@@ -299,26 +308,10 @@ func runParallelProcessor() error {
 		"spool_dir", cfg.SpoolDir,
 		"workers", cfg.Processing.Workers,
 		"keep_spool", cfg.Processing.KeepSpool)
-
-	// Setup external services
-	grobid := grobidclient.New(cfg.Grobid.Host)
-	slog.Info("grobid client", "host", cfg.Grobid.Host)
-
-	s3opts := &blobproc.WrapS3Options{
-		AccessKey:     strings.TrimSpace(cfg.S3.AccessKey),
-		SecretKey:     strings.TrimSpace(cfg.S3.SecretKey),
-		DefaultBucket: cfg.S3.DefaultBucket,
-		UseSSL:        cfg.S3.UseSSL,
+	if err := ensureSpoolDir(); err != nil {
+		return err
 	}
-
-	wrapS3, err := blobproc.NewWrapS3(cfg.S3.Endpoint, s3opts)
-	if err != nil {
-		slog.Error("cannot access S3", "err", err)
-		return fmt.Errorf("cannot access S3: %w", err)
-	}
-	slog.Info("s3 wrapper", "endpoint", cfg.S3.Endpoint)
-
-	// Setup parallel walker using existing WalkFast
+	grobid, wrapS3 := setupServices()
 	walker := blobproc.WalkFast{
 		Dir:               cfg.SpoolDir,
 		NumWorkers:        cfg.Processing.Workers,
@@ -328,97 +321,104 @@ func runParallelProcessor() error {
 		Grobid:            grobid,
 		S3:                wrapS3,
 	}
-
 	return walker.Run(context.Background())
 }
 
 func processSingleFile(ctx context.Context, path string, size int64, grobid *grobidclient.Grobid, wrapS3 *blobproc.WrapS3) error {
-	// Fulltext and thumbnail via local command line tools
 	result := pdfextract.ProcessFile(ctx, path, &pdfextract.Options{
 		Dim:       pdfextract.Dim{180, 300},
 		ThumbType: "JPEG",
 	})
-
 	switch {
 	case result.Status != "success":
 		slog.Warn("pdfextract failed", "status", result.Status, "err", result.Err)
 	case len(result.SHA1Hex) != blobproc.ExpectedSHA1Length:
 		slog.Warn("invalid sha1 in response", "sha1", result.SHA1Hex)
 	case result.Status == "success":
-		// Save thumbnail if available
 		if result.HasPage0Thumbnail() {
-			opts := blobproc.BlobRequestOptions{
-				Bucket:  "thumbnail",
-				Folder:  "pdf",
-				Blob:    result.Page0Thumbnail,
-				SHA1Hex: result.SHA1Hex,
-				Ext:     "180px.jpg",
-				Prefix:  "",
-			}
-			resp, err := wrapS3.PutBlob(ctx, &opts)
-			if err != nil {
-				slog.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
-			} else {
-				slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+			switch {
+			case wrapS3 == nil:
+				slog.Debug("skipping S3 put (thumbnail), S3 client not available", "sha1", result.SHA1Hex)
+			default:
+				opts := blobproc.BlobRequestOptions{
+					Bucket:  "thumbnail",
+					Folder:  "pdf",
+					Blob:    result.Page0Thumbnail,
+					SHA1Hex: result.SHA1Hex,
+					Ext:     "180px.jpg",
+					Prefix:  "",
+				}
+				resp, err := wrapS3.PutBlob(ctx, &opts)
+				if err != nil {
+					slog.Error("s3 failed (thumbnail)", "err", err, "sha1", result.SHA1Hex)
+				} else {
+					slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+				}
 			}
 		}
-
-		// Save text if available
 		if len(result.Text) > 0 {
-			opts := blobproc.BlobRequestOptions{
-				Bucket:  "sandcrawler",
-				Folder:  "text",
-				Blob:    []byte(result.Text),
-				SHA1Hex: result.SHA1Hex,
-				Ext:     "txt",
-				Prefix:  "",
-			}
-			resp, err := wrapS3.PutBlob(ctx, &opts)
-			if err != nil {
-				slog.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
-			} else {
-				slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+			switch {
+			case wrapS3 == nil:
+				slog.Debug("skipping S3 put (text), S3 client not available", "sha1", result.SHA1Hex)
+			default:
+				opts := blobproc.BlobRequestOptions{
+					Bucket:  "sandcrawler",
+					Folder:  "text",
+					Blob:    []byte(result.Text),
+					SHA1Hex: result.SHA1Hex,
+					Ext:     "txt",
+					Prefix:  "",
+				}
+				resp, err := wrapS3.PutBlob(ctx, &opts)
+				if err != nil {
+					slog.Error("s3 failed (text)", "err", err, "sha1", result.SHA1Hex)
+				} else {
+					slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
+				}
 			}
 		}
 	}
-
-	// Skip GROBID if file too large
+	if grobid == nil {
+		slog.Debug("skipping GROBID processing, GROBID client not available", "path", path)
+		return nil
+	}
 	if size > cfg.Grobid.MaxFileSize {
 		slog.Warn("skipping too large file for GROBID", "path", path, "size", size)
 		return nil
 	}
-
-	// Process with GROBID
 	gres, err := grobid.ProcessPDFContext(ctx, path, "processFulltextDocument", &grobidclient.Options{
 		GenerateIDs:            true,
 		ConsolidateHeader:      true,
 		ConsolidateCitations:   false,
 		IncludeRawCitations:    true,
-		IncluseRawAffiliations: true,
+		IncludeRawAffiliations: true,
 		TEICoordinates:         []string{"ref", "figure", "persName", "formula", "biblStruct"},
 		SegmentSentences:       true,
 	})
-
 	switch {
 	case err != nil || gres.Err != nil:
 		slog.Warn("grobid failed", "err", err)
 	default:
-		opts := blobproc.BlobRequestOptions{
-			Bucket:  "sandcrawler",
-			Folder:  "grobid",
-			Blob:    gres.Body,
-			SHA1Hex: gres.SHA1Hex,
-			Ext:     "tei.xml",
-			Prefix:  "",
+		switch {
+		case wrapS3 == nil:
+			slog.Debug("skipping S3 put (grobid), S3 client not available", "sha1", gres.SHA1Hex)
+		default:
+			opts := blobproc.BlobRequestOptions{
+				Bucket:  "sandcrawler",
+				Folder:  "grobid",
+				Blob:    gres.Body,
+				SHA1Hex: gres.SHA1Hex,
+				Ext:     "tei.xml",
+				Prefix:  "",
+			}
+			resp, err := wrapS3.PutBlob(ctx, &opts)
+			if err != nil {
+				slog.Error("s3 failed (grobid)", "err", err)
+				return err
+			}
+			slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 		}
-		resp, err := wrapS3.PutBlob(ctx, &opts)
-		if err != nil {
-			slog.Error("s3 failed (grobid)", "err", err)
-			return err
-		}
-		slog.Debug("s3 put ok", "bucket", resp.Bucket, "path", resp.ObjectPath)
 	}
-
 	return nil
 }
 
@@ -480,7 +480,6 @@ func showConfig() error {
 
 	fmt.Printf("Processing:\n")
 	fmt.Printf("  Workers: %d\n", cfg.Processing.Workers)
-	fmt.Printf("  Parallel: %t\n", cfg.Processing.Parallel)
 	fmt.Printf("  Keep Spool: %t\n", cfg.Processing.KeepSpool)
 
 	return nil

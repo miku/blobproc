@@ -34,3 +34,4 @@ coverage.html
 TODO.md
 .env
 CLAUDE.md
+.claude/*
