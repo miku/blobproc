@@ -27,29 +27,34 @@ var (
 	fromWarcFile = flag.String("W", "", "start with a local WARC file")
 	outputDir    = flag.String("o", "", "output directory, by default, use users cache dir")
 	postURL      = flag.String("u", "", "POST extracted content to this URL")
+	verbose      = flag.Bool("v", false, "be verbose")
 	// TODO: CDX, item, collection
 )
 
 // extractItemID extracts the item ID from either a full URL or just the ID
 func extractItemID(input string) string {
-	// Check if the input is a full URL
 	if strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "https://") {
-		// Parse the URL to extract the item ID from the path
-		// Expected format: https://archive.org/details/ITEM_ID
 		parts := strings.Split(input, "/")
 		for i, part := range parts {
 			if part == "details" && i+1 < len(parts) {
 				return parts[i+1]
 			}
 		}
-		// If the 'details' path segment is not found, try to get the last segment
 		if len(parts) > 0 {
 			return parts[len(parts)-1]
 		}
 	}
-	// If it's not a URL or we couldn't extract from the URL, return as-is
 	return input
 }
+
+// debugProcessor takes an extracted item and does basic filtering and logging.
+var debugProcessor = warcutil.FuncProcessor(func(e *warcutil.Extracted) error {
+	if e.StatusCode != http.StatusOK {
+		return nil
+	}
+	log.Println(e.StatusCode, e.Size, e.URI)
+	return nil
+})
 
 func main() {
 	flag.Parse()
@@ -57,8 +62,6 @@ func main() {
 	case *fromItem != "":
 		// Extract the item ID in case a full URL was provided
 		itemID := extractItemID(*fromItem)
-
-		// prepare cache dir
 		cacheDir, err := os.UserCacheDir()
 		if err != nil {
 			log.Fatal(err)
@@ -84,47 +87,50 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("found %d files in %s", len(item.Files), itemID)
+		// Crawl data items are about 50GB in total, with about 1GB per files,
+		// with 100-10000s of PDF.
 		for i, file := range item.Files {
 			if !strings.HasSuffix(file.Name, ".warc.gz") {
 				continue
 			}
 			// https://archive.org/download/OPENALEX-CRAWL-2025-09-20251011130616382-07663-07716-wbgrp-crawl047/OPENALEX-CRAWL-2025-09-20251011144946523-07666-2129926~wbgrp-crawl047.us.archive.org~8443.warc.gz
 			fileURL := fmt.Sprintf("https://archive.org/download/%s/%s", itemID, file.Name)
+			log.Printf("processing file %d/%d: %v", i, len(item.Files), fileURL)
 			resp, err := http.Get(fileURL)
 			if err != nil {
 				log.Fatal(err)
 			}
 			defer resp.Body.Close()
-
-			// sample extractor that would only output the pdf url as it is found in the warc
-			var debugProcessor = warcutil.FuncProcessor(func(e *warcutil.Extracted) error {
-				if e.StatusCode != http.StatusOK {
-					return nil
-				}
-				log.Println(i, e.StatusCode, e.Size, e.URI)
-				return nil
-			})
 			extractor := &warcutil.Extractor{
 				Filters: []warcutil.ResponseFilter{
-					warcutil.PDFResponseFilter,
+					warcutil.PDFResponseFilter, // TODO: just PDF as default, but that is not fixed
+					warcutil.NonZeroContentLengthFilter,
 				},
-				Processors: []warcutil.Processor{
-					debugProcessor,
-					// &warcutil.HashDirProcessor{
-					// 	Dir:       appCacheDir,
-					// 	Extension: ".pdf",
-					// },
-				},
+				Processors: []warcutil.Processor{},
 			}
-			if *postURL != "" {
+			switch {
+			case *verbose:
+				extractor.Processors = append(extractor.Processors, debugProcessor)
+				fallthrough
+			case *outputDir != "":
+				processor := &warcutil.DirProcessor{
+					Dir:       *outputDir,
+					Prefix:    "blobfetch-",
+					Extension: ".pdf",
+				}
+				extractor.Processors = append(extractor.Processors, processor)
+				fallthrough
+			case *postURL != "":
 				var httpPostProcessor = &warcutil.HttpPostProcessor{
 					URL: *postURL,
 				}
 				extractor.Processors = append(extractor.Processors, httpPostProcessor)
 			}
+			log.Printf("extractor has %d processor(s)", len(extractor.Processors))
 			if err := extractor.Extract(resp.Body); err != nil {
 				log.Fatal(err)
 			}
+			_ = resp.Body.Close()
 		}
 	case *fromWarcFile != "":
 		f, err := os.Open(*fromWarcFile)
@@ -132,14 +138,12 @@ func main() {
 			log.Fatal(err)
 		}
 		defer f.Close()
-		var (
-			extractor = warcutil.Extractor{
-				Filters: []warcutil.ResponseFilter{
-					warcutil.PDFResponseFilter,
-				},
-				Processors: []warcutil.Processor{},
-			}
-		)
+		extractor := &warcutil.Extractor{
+			Filters: []warcutil.ResponseFilter{
+				warcutil.PDFResponseFilter,
+			},
+			Processors: []warcutil.Processor{},
+		}
 		switch {
 		case *outputDir != "":
 			processor := &warcutil.DirProcessor{
@@ -153,6 +157,8 @@ func main() {
 				URL: *postURL,
 			}
 			extractor.Processors = append(extractor.Processors, httpPostProcessor)
+		case *verbose:
+			extractor.Processors = append(extractor.Processors, debugProcessor)
 		default:
 			extractor.Processors = append(extractor.Processors, warcutil.DebugProcessor)
 		}
@@ -160,6 +166,6 @@ func main() {
 			log.Fatal(err)
 		}
 	default:
-		log.Println("blobfetch")
+		log.Println("blobfetch: move data from petabox into cache")
 	}
 }

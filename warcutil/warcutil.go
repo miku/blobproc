@@ -54,6 +54,15 @@ var PDFResponseFilter = func(resp *http.Response) bool {
 	return strings.HasPrefix(ct, "application/pdf")
 }
 
+var NonZeroContentLengthFilter = func(resp *http.Response) bool {
+	ct := resp.Header.Get("Content-Length")
+	l, err := strconv.Atoi(ct)
+	if err != nil || l == 0 {
+		return false
+	}
+	return true
+}
+
 var DebugProcessor = FuncProcessor(func(e *Extracted) error {
 	log.Println(e.URI)
 	return nil
@@ -72,8 +81,24 @@ func (d *DirProcessor) Process(ex *Extracted) error {
 		return err
 	}
 	defer f.Close()
-	if _, err := io.Copy(f, ex.Content); err != nil {
-		return err
+
+	// Only limit the reader if the size is positive, otherwise copy all content
+	var reader io.Reader
+	if ex.Size > 0 {
+		reader = io.LimitReader(ex.Content, ex.Size)
+	} else {
+		reader = ex.Content
+	}
+
+	_, err = io.Copy(f, reader)
+	// An EOF error from io.Copy when using io.LimitReader is expected when the limit is reached
+	// and should not be treated as a failure
+	if err == io.ErrUnexpectedEOF {
+		log.Printf("[skip] %v got %v", ex.URI, err)
+		return nil
+	}
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("copy: %w", err)
 	}
 	return nil
 }
@@ -146,7 +171,7 @@ func (h *HttpPostProcessor) Process(ex *Extracted) error {
 		h.Client = http.DefaultClient
 	}
 	buf := bytes.Buffer{}
-	if _, err := io.Copy(&buf, ex.Content); err != nil {
+	if _, err := io.CopyN(&buf, ex.Content, ex.Size); err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
 	req, err := http.NewRequest("POST", h.URL, &buf)
