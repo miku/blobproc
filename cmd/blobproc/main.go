@@ -6,12 +6,16 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 	"github.com/miku/blobproc"
 	"github.com/miku/blobproc/config"
 	"github.com/miku/blobproc/pdfextract"
@@ -37,7 +41,8 @@ Examples:
   blobproc run                    # Process files from spool directory (sequential)
   blobproc run -w 4               # Process with 4 parallel workers
   blobproc single file.pdf        # Process single file for testing
-  blobproc config                 # Show current configuration`,
+  blobproc config                 # Show current configuration
+  blobproc serve                  # Start server to accept and store pdfs`,
 	Version: blobproc.Version,
 }
 
@@ -75,6 +80,22 @@ value comes from (default, config file, environment variable, or flag).`,
 	},
 }
 
+// Serve command - run HTTP server
+var serveCmd = &cobra.Command{
+	Use:   "serve [flags]",
+	Short: "Run HTTP server to receive PDF blobs",
+	Long: `Start an HTTP server that receives binary PDF data via POST or PUT
+requests and stores them in the spool folder for later processing.
+
+The server provides the following endpoints:
+  POST/PUT /spool    - Upload a PDF blob
+  GET /spool         - List spool contents
+  GET /spool/{id}    - Get status of a specific spool item`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runServer()
+	},
+}
+
 func main() {
 	Execute()
 }
@@ -96,6 +117,7 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(singleCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(serveCmd)
 
 	// Global flags (using hardcoded defaults - use 'blobproc config' to see effective values)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("config file (searches: ./blobproc.yaml, %s/.config/blobproc/blobproc.yaml, /etc/blobproc/blobproc.yaml)", os.Getenv("HOME")))
@@ -123,6 +145,13 @@ func init() {
 	// Config-specific flags
 	configCmd.Flags().Bool("show-defaults", false, "show default configuration values")
 	configCmd.Flags().Bool("show-file", false, "show config file location")
+
+	// Serve-specific flags
+	serveCmd.Flags().String("addr", config.DefaultServerAddr, "server listen address")
+	serveCmd.Flags().Duration("server-timeout", config.DefaultServerTimeout, "server read/write timeout")
+	serveCmd.Flags().String("access-log", config.DefaultAccessLog, "access log file (empty = discard)")
+	serveCmd.Flags().String("urlmap-file", config.DefaultURLMapFile, "URL map database file (empty = disabled)")
+	serveCmd.Flags().String("urlmap-header", config.DefaultURLMapHeader, "HTTP header for URL mapping")
 }
 
 func initConfig() error {
@@ -166,6 +195,13 @@ func initConfig() error {
 	// Config flags
 	v.BindPFlag("config.show_defaults", configCmd.Flags().Lookup("show-defaults"))
 	v.BindPFlag("config.show_file", configCmd.Flags().Lookup("show-file"))
+
+	// Serve flags
+	v.BindPFlag("server.addr", serveCmd.Flags().Lookup("addr"))
+	v.BindPFlag("server.timeout", serveCmd.Flags().Lookup("server-timeout"))
+	v.BindPFlag("server.access_log", serveCmd.Flags().Lookup("access-log"))
+	v.BindPFlag("server.urlmap_file", serveCmd.Flags().Lookup("urlmap-file"))
+	v.BindPFlag("server.urlmap_header", serveCmd.Flags().Lookup("urlmap-header"))
 
 	// Unmarshal config
 	if err := v.Unmarshal(&cfg); err != nil {
@@ -506,4 +542,70 @@ func maskSensitive(value string) string {
 		return "****"
 	}
 	return value[:2] + "****" + value[len(value)-2:]
+}
+
+func runServer() error {
+	slog.Info("starting HTTP server",
+		"addr", cfg.Server.Addr,
+		"spool_dir", cfg.SpoolDir,
+		"timeout", cfg.Server.Timeout)
+
+	if err := ensureSpoolDir(); err != nil {
+		return err
+	}
+
+	// Setup access log writer
+	var accessLogWriter io.Writer
+	switch {
+	case cfg.Server.AccessLog != "":
+		f, err := os.OpenFile(cfg.Server.AccessLog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return fmt.Errorf("cannot open access log: %w", err)
+		}
+		defer f.Close()
+		accessLogWriter = f
+	default:
+		accessLogWriter = io.Discard
+	}
+
+	// Setup web spool service
+	svc := &blobproc.WebSpoolService{
+		Dir:              cfg.SpoolDir,
+		ListenAddr:       cfg.Server.Addr,
+		URLMapHttpHeader: cfg.Server.URLMapHeader,
+	}
+
+	// Setup URL map if configured
+	if cfg.Server.URLMapFile != "" {
+		urlMap := blobproc.URLMap{Path: cfg.Server.URLMapFile}
+		if err := urlMap.EnsureDB(); err != nil {
+			return fmt.Errorf("cannot initialize URL map: %w", err)
+		}
+		svc.URLMap = &urlMap
+	}
+
+	// Setup router
+	r := mux.NewRouter()
+	banner := `{"id": "blobproc serve", "about": "Send your PDF payload to %s/spool - a 200 OK status only confirms receipt, not successful postprocessing, which may take more time. Check Location header for spool id."}`
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, banner+"\n", cfg.Server.Addr)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+	r.HandleFunc("/spool", svc.BlobHandler).Methods("POST", "PUT")
+	r.HandleFunc("/spool", svc.SpoolListHandler).Methods("GET")
+	r.HandleFunc("/spool/{id}", svc.SpoolStatusHandler).Methods("GET")
+
+	loggedRouter := handlers.LoggingHandler(accessLogWriter, r)
+	srv := &http.Server{
+		Handler:      loggedRouter,
+		Addr:         cfg.Server.Addr,
+		WriteTimeout: cfg.Server.Timeout,
+		ReadTimeout:  cfg.Server.Timeout,
+	}
+
+	slog.Info("server ready", "addr", srv.Addr, "spool", cfg.SpoolDir)
+	log.Fatal(srv.ListenAndServe())
+	return nil
 }

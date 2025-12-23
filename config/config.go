@@ -25,6 +25,11 @@ var (
 	DefaultWorkers         = 4
 	DefaultKeepSpool       = false
 	DefaultDebug           = false
+	DefaultServerAddr      = "0.0.0.0:8000"
+	DefaultServerTimeout   = 15 * time.Second
+	DefaultAccessLog       = ""
+	DefaultURLMapFile      = ""
+	DefaultURLMapHeader    = "X-Original-URL"
 )
 
 type Config struct {
@@ -42,6 +47,9 @@ type Config struct {
 
 	// Processing settings
 	Processing ProcessingConfig `mapstructure:"processing"`
+
+	// Server settings
+	Server ServerConfig `mapstructure:"server"`
 }
 
 type S3Config struct {
@@ -61,6 +69,14 @@ type GrobidConfig struct {
 type ProcessingConfig struct {
 	Workers   int  `mapstructure:"workers"`
 	KeepSpool bool `mapstructure:"keep_spool"`
+}
+
+type ServerConfig struct {
+	Addr            string        `mapstructure:"addr"`
+	Timeout         time.Duration `mapstructure:"timeout"`
+	AccessLog       string        `mapstructure:"access_log"`
+	URLMapFile      string        `mapstructure:"urlmap_file"`
+	URLMapHeader    string        `mapstructure:"urlmap_header"`
 }
 
 func Init() (*viper.Viper, error) {
@@ -116,4 +132,11 @@ func setDefaults(v *viper.Viper) {
 	// Processing defaults
 	v.SetDefault("processing.workers", DefaultWorkers)
 	v.SetDefault("processing.keep_spool", DefaultKeepSpool)
+
+	// Server defaults
+	v.SetDefault("server.addr", DefaultServerAddr)
+	v.SetDefault("server.timeout", DefaultServerTimeout)
+	v.SetDefault("server.access_log", DefaultAccessLog)
+	v.SetDefault("server.urlmap_file", DefaultURLMapFile)
+	v.SetDefault("server.urlmap_header", DefaultURLMapHeader)
 }
