@@ -20,11 +20,12 @@ import (
 )
 
 const (
+	DefaultURLMapHttpHeader = "X-BLOBPROC-URL"
+	ExpectedSHA1Length      = 40
+
 	tempFilePattern           = "blobprocd-*"
-	DefaultURLMapHttpHeader   = "X-BLOBPROC-URL"
 	defaultMinFreeDiskPercent = 10
 	defaultRetryAfterSeconds  = 60
-	ExpectedSHA1Length        = 40
 )
 
 var errShortName = errors.New("short name")
