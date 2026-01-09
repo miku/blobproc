@@ -25,6 +25,65 @@ The typical workflow involves running **blobproc serve** to accept incoming PDFs
 stored in a spool directory. A separate process or timer runs **blobproc run** to process
 spooled files and generate derivatives.
 
+OVERVIEW
+========
+
+Overview of data flow, from top to bottom.
+
+```
+                      PDF SOURCES
+                          │
+          ┌───────────────┼───────────────┐
+          │               │               │
+      Heritrix      WARC Files        Manual/
+      Crawler         │               curl/etc
+          │         blobfetch              │
+          │           │                    │
+          │           ├─────┐              │
+          │           │     │              │
+          │           v     v              v
+          │      ┌─────────────────────────┐
+          └─────>│   blobproc serve        │
+                 │  (HTTP endpoint)        │
+                 │  :8000/upload           │
+                 └──────────┬──────────────┘
+                            │
+                            v
+                 ┌──────────────────────┐
+                 │   SPOOL DIRECTORY    │
+                 │  ~/.local/share/...  │
+                 │   (file queue)       │
+                 └──────────┬───────────┘
+                            │
+                            v
+                 ┌──────────────────────┐
+                 │   blobproc run       │<─── systemd timer
+                 │  (batch processor)   │     (periodic)
+                 └──────────┬───────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              │             │             │
+              v             v             v
+        ┌─────────┐   ┌─────────┐   ┌─────────┐
+        │ GROBID  │   │pdftotext│   │pdftoppm │
+        │ (XML)   │   │ (text)  │   │ (thumb) │
+        └────┬────┘   └────┬────┘   └────┬────┘
+             │             │             │
+             └─────────────┼─────────────┘
+                           │ (parallel)
+                           v
+                     ┌───────────┐
+                     │ S3 Store  │
+                     │(seaweedfs)│
+                     └───────────┘
+                           │
+                           v
+                      [Artifacts]
+                    (fulltext.txt)
+                    (metadata.xml)
+                    (thumbnail.png)
+```
+
 COMMANDS
 ========
 
