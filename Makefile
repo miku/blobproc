@@ -2,7 +2,7 @@ SHELL := /bin/bash
 TARGETS := blobproc blobfetch
 PKGNAME := blobproc
 MAKEFLAGS := --jobs=$(shell nproc)
-VERSION := 0.3.31 # change this and then run "make update-version"
+VERSION := 0.3.33 # change this and then run "make update-version"
 
 .PHONY: all
 all: $(TARGETS)
@@ -39,14 +39,10 @@ update-all-deps:
 
 .PHONY: deb
 deb: $(TARGETS)
-	mkdir -p packaging/deb/$(PKGNAME)/usr/local/bin
-	cp $(TARGETS) packaging/deb/$(PKGNAME)/usr/local/bin
-	cd packaging/deb && fakeroot dpkg-deb -Zzstd --build $(PKGNAME) .
-	mv packaging/deb/$(PKGNAME)_*.deb .
-
+	GOARCH=amd64 SEMVER=$(VERSION) nfpm package -p deb
+	GOARCH=arm64 SEMVER=$(VERSION) nfpm package -p deb
 
 .PHONY: update-version
 update-version:
 	sed -i -e 's@^const Version =.*@const Version = "$(VERSION)"@' version.go
-	sed -i -e 's@^Version:.*@Version: $(VERSION)@' packaging/deb/blobproc/DEBIAN/control
 
