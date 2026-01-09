@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/miku/blobproc/fileutils"
 	"github.com/shirou/gopsutil/v3/disk"
 )
 
@@ -309,8 +310,8 @@ func (svc *WebSpoolService) BlobHandler(w http.ResponseWriter, r *http.Request) 
 		}
 		slog.Debug("warning: found existing file, but size differ, overwriting")
 	}
-	if err := os.Rename(tmpf.Name(), dst); err != nil {
-		slog.Error("failed to rename", "err", err)
+	if err := fileutils.MoveFile(dst, tmpf.Name()); err != nil {
+		slog.Error("failed to move file", "err", err)
 		http.Error(w, "failed to save file", http.StatusInternalServerError)
 		return
 	}
