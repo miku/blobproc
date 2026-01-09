@@ -97,6 +97,9 @@ contents:
   - src: blobfetch
     dst: /usr/local/bin/blobfetch
 
+  - src: docs/blobproc.1
+    dst: /usr/local/man/man1/blobproc.1
+
 
 # Umask to be used on files without explicit mode set.
 #
